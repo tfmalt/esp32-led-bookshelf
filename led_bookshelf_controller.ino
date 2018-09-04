@@ -1,8 +1,10 @@
 /*
  * A first attempt at writing code for ESP32.
- * This is going to be a led light controller for my daughters book shelf.
+ * This is going to be a led light controller for lights on my daughters book shelf.
  * 
- * Copyright (c) 2018 Thomas Malt <thomas@malt.no>
+ * MIT License
+ * 
+ * Copyright (c) 2018 Thomas Malt
  */
 
 #include <FS.h>
