@@ -1,0 +1,9 @@
+{
+  "ssid": "example",
+  "psk": "example password",
+  "server": "mqtt server",
+  "port": 8883,
+  "username": "mqtt username",
+  "password": "mqtt password",
+  "client": "mqtt client name"
+}
