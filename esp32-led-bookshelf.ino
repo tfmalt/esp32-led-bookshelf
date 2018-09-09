@@ -17,12 +17,42 @@
 // TLS Root Certificate to be read from SPIFFS
 String ca_root;
 
-// global objects
-StaticJsonBuffer<512> configBuffer;
-StaticJsonBuffer<420> currentLedState;
-JsonVariant config;
-JsonVariant ledState;
+typedef struct Config {
+  String ssid;
+  String psk;
+  String server;
+  int  port;
+  String username;
+  String password;
+  String client;
+  String command_topic;
+  String state_topic;
+  String status_topic;
+} Config;
 
+typedef struct Color {
+  uint8_t r;
+  uint8_t g;
+  uint8_t b;
+  float x;
+  float y;
+  float h;
+  float s;
+} Color;
+
+typedef struct LightState {
+  uint8_t brightness;
+  uint8_t color_temp; 
+  uint8_t white_value;
+  uint16_t transition;
+  Color color;
+  String effect;
+  bool state;
+} LightState;
+
+Config config;
+
+// global objects
 WiFiClientSecure wifiClient;
 PubSubClient mqttClient;
 
@@ -50,16 +80,31 @@ void readConfig()
     return;
   }
 
-  config = configBuffer.parseObject(file);
+  StaticJsonBuffer<512> configBuffer;
+  JsonObject& root = configBuffer.parseObject(file);
 
-  if (!config.success()) {
+  if (!root.success()) {
     Serial.println("  - parsing jsonBuffer failed");
     return;
   }
 
+  config.ssid          = (const char*) root["ssid"];
+  config.psk           = (const char*) root["psk"];
+  config.server        = (const char*) root["server"];
+  config.port          = (int)         root["port"];
+  config.username      = (const char*) root["username"];
+  config.password      = (const char*) root["password"];
+  config.client        = (const char*) root["client"];
+  config.command_topic = (const char*) root["command_topic"];
+  config.state_topic   = (const char*) root["state_topic"];
+  config.status_topic  = (const char*) root["status_topic"];
+
   file.close();
 }
 
+/**
+ * Reads the TLS CA Root Certificate from file.
+ */
 void readCA() 
 {
   const char* path = "/ca.pem";
@@ -81,18 +126,19 @@ void readCA()
   file.close();
 }
 
+
+/**
+ * Configure and setup wifi
+ */
 void setupWifi() 
 {
-  const char* ssid   = config["ssid"];
-  const char* psk    = config["psk"];
-  
   digitalWrite(BUILTIN_LED, LOW);
 
   delay(10);
 
-  Serial.printf("Connecting to: %s ", ssid);
+  Serial.printf("Connecting to: %s ", config.ssid.c_str());
   
-  WiFi.begin(ssid, psk);
+  WiFi.begin(config.ssid.c_str(), config.psk.c_str());
 
   while (WiFi.status() != WL_CONNECTED) {
     digitalWrite(BUILTIN_LED, HIGH);
@@ -110,49 +156,44 @@ void setupWifi()
 
 void setupMQTT()
 {
-  const char* server = config["server"];
-  const int port = config["port"];
-
   wifiClient.setCACert(ca_root.c_str());
 
-  Serial.printf("Setting up MQTT Client: %s %i\n", server, port);
+  Serial.printf("Setting up MQTT Client: %s %i\n", config.server.c_str(), config.port);
 
   mqttClient.setClient(wifiClient);
-  mqttClient.setServer(server, port); 
+  mqttClient.setServer(config.server.c_str(), config.port); 
   mqttClient.setCallback(mqttCallback);
 }
 
 void connectMQTT() 
 {
-  const char* server      = config["server"];
-  const char* username    = config["username"];
-  const char* password    = config["password"];
-  const char* client      = config["client"];
-  const char* statusTopic = config["status_topic"];
-  const char* commandTopic = config["command_topic"];
-  const int   port        = config["port"];
-
   digitalWrite(BUILTIN_LED, HIGH);
   IPAddress mqttip;
-  WiFi.hostByName(server, mqttip);
+  WiFi.hostByName(config.server.c_str(), mqttip);
 
-  Serial.printf("  - %s = ", server);
+  Serial.printf("  - %s = ", config.server.c_str());
   Serial.println(mqttip);
 
   while (!mqttClient.connected()) {
     Serial.printf(
       "Attempting MQTT connection to \"%s\" \"%i\" as \"%s\" \"%s\"... ", 
-      server, port, username, password
+      config.server.c_str(), config.port, config.username.c_str(), config.password.c_str()
     );
     
-    if (mqttClient.connect(client, username, password, statusTopic, 0, true, "Disconnected")) {
+    if (mqttClient.connect(
+      config.client.c_str(), 
+      config.username.c_str(), 
+      config.password.c_str(), 
+      config.status_topic.c_str(), 
+      0, true, "Disconnected")
+    ) {
       Serial.println(" connected");
       Serial.print("  - status: ");
-      Serial.println(statusTopic);
+      Serial.println(config.status_topic);
       Serial.print("  - command: ");
-      Serial.println(commandTopic);
-      mqttClient.publish(statusTopic, "Online", true);
-      mqttClient.subscribe(commandTopic);
+      Serial.println(config.command_topic);
+      mqttClient.publish(config.status_topic.c_str(), "Online", true);
+      mqttClient.subscribe(config.command_topic.c_str());
     } 
     else {  
       Serial.print(" failed: ");
@@ -164,44 +205,33 @@ void connectMQTT()
   digitalWrite(BUILTIN_LED, LOW);
 }
 
-/*
- * MQTT_json example:
- *  {
- *    "brightness": 255,
- *    "color_temp": 155,
- *    "color": {
- *      "r": 255,
- *      "g": 180,
- *      "b": 200,
- *      "x": 0.406,
- *      "y": 0.301,
- *      "h": 344.0,
- *      "s": 29.412
- *    },
- *    "effect": "colorloop",
- *    "state": "ON",
- *    "transition": 2,
- *    "white_value": 150
- *  }
- */
-void mqttCallback (char* p_topic, byte* p_message, unsigned int p_length)
+
+String mqttPaylodToString(byte* p_payload, unsigned int p_length)
 {
-  String commandTopic = config["command_topic"];
-  const char* stateTopic   = config["state_topic"];
   String message;
 
-  digitalWrite(BUILTIN_LED, HIGH);
-
   for (uint8_t i = 0; i < p_length; i++) {
-    message.concat( (char) p_message[i] );
+    message.concat( (char) p_payload[i] );
   }
 
-  Serial.print("INFO: New MQTT message. topic: ");
-  Serial.println(p_topic);
-  Serial.println("INFO: Message: ");
+  return message;
+}
+
+void mqttCallback (char* p_topic, byte* p_message, unsigned int p_length)
+{
+  String message = mqttPaylodToString(p_message, p_length);
+
+  digitalWrite(BUILTIN_LED, HIGH);
+  Serial.printf("INFO: New MQTT message: '%s'\n", p_topic);
+  Serial.println("  - INFO: Message: ");
   Serial.println(message);
 
-  if (commandTopic.equals(p_topic)) {
+  if (!String(config.command_topic).equals(p_topic)) {
+    Serial.printf("  - ERROR: Not a valid topic: '%s'. IGNORING\n", p_topic);
+    return;
+  }
+
+  if (String(config.command_topic).equals(p_topic)) {
     StaticJsonBuffer<420> jsonBuffer;
     JsonObject& root = jsonBuffer.parseObject(p_message);
 
@@ -213,21 +243,67 @@ void mqttCallback (char* p_topic, byte* p_message, unsigned int p_length)
 
     if (root.containsKey("state")) {
       String output;
+      LightState newState = {0};
+
       root.printTo(output);
 
-      Serial.println("DEBUG: object got state");
-      Serial.println("INFO: publishing new state:");
+      Serial.println("  - DEBUG: Got valid state in object");
       Serial.println(output);
 
-      bool state = (root["state"] == "ON") ? true : false;
-      Serial.print("state is: ");
-      Serial.println(state);
+      newState.state = (root["state"] == "ON") ? true : false;
 
-      mqttClient.publish(stateTopic, output.c_str(), true);
+      if (root.containsKey("color")) {
+        JsonObject& color = root["color"].as<JsonObject>();
+        if (!color.success()) {
+          Serial.println("ERROR: invalid color statement found. Skipping");
+          digitalWrite(BUILTIN_LED, LOW);
+          return;
+        }
+
+        Serial.println("Object got color.");
+        if (color.containsKey("r")) newState.color.r = color["r"];
+        if (color.containsKey("g")) newState.color.g = color["g"];
+        if (color.containsKey("b")) newState.color.b = color["b"]; 
+        if (color.containsKey("x")) newState.color.b = color["x"]; 
+        if (color.containsKey("y")) newState.color.b = color["y"]; 
+        if (color.containsKey("h")) newState.color.b = color["h"]; 
+        if (color.containsKey("s")) newState.color.b = color["s"]; 
+      } 
+      else {
+        Serial.println("  - DEBUG: Did not get color");
+      }
+
+      Serial.print("state is: ");
+      Serial.println(newState.state);
+      Serial.print("R:");
+      Serial.print(newState.color.r);
+      Serial.print(", G:");
+      Serial.print(newState.color.g);
+      Serial.print(", B:");
+      Serial.print(newState.color.b);
+
+      mqttClient.publish(config.state_topic.c_str(), output.c_str(), true);
+    }
+    else {
+      Serial.println("WARN: Got something else. Stopping parsing.");
     }
   }
 
   digitalWrite(BUILTIN_LED, LOW);
+}
+
+void setupLeds()
+{
+  // Starting led setup
+  // initialize the digital pin as an output.
+  ledcAttachPin(red, 1);
+  ledcAttachPin(green, 2);
+  ledcAttachPin(blue, 3);
+
+  ledcSetup(1, 12000, 8);
+  ledcSetup(2, 12000, 8);
+  ledcSetup(3, 12000, 8);
+
 }
 
 void setup()
@@ -250,22 +326,10 @@ void setup()
   readCA();
   setupWifi();
   setupMQTT();
-
-  // Serial.printf("builtin led: %i\n", BUILTIN_LED);
-  // Starting led setup
-  // initialize the digital pin as an output.
-  ledcAttachPin(red, 1);
-  ledcAttachPin(green, 2);
-  ledcAttachPin(blue, 3);
-
-  ledcSetup(1, 12000, 8);
-  ledcSetup(2, 12000, 8);
-  ledcSetup(3, 12000, 8);
+  setupLeds();
 }
 
 void loop() {
-  const char* server = config["server"];
-
   // wait for WiFi connection
   if((WiFi.status() != WL_CONNECTED)) {
     Serial.println("WiFI not connected.");
@@ -275,7 +339,7 @@ void loop() {
   }
 
   if (!mqttClient.connected()) {
-    Serial.printf("Not connected to MQTT broker: %s\n", server);
+    Serial.printf("Not connected to MQTT broker: %s\n", config.server.c_str());
     connectMQTT();
   }
 
