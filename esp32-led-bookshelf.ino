@@ -50,18 +50,22 @@ typedef struct LightState {
   bool state;
 } LightState;
 
-Config config;
-
 // global objects
+Config           config;
+LightState       currentState;
 WiFiClientSecure wifiClient;
-PubSubClient mqttClient;
+PubSubClient     mqttClient;
 
 uint8_t counter = 0;
 
 // led GPIOs
-uint8_t red   = 25;
-uint8_t green = 26;
-uint8_t blue  = 27;
+#define GPIO_RED   25
+#define GPIO_GREEN 26
+#define GPIO_BLUE  27
+
+#define LEDC_RED    1
+#define LEDC_GREEN  2
+#define LEDC_BLUE   3
 
 uint8_t color = 0;          // a value from 0 to 255 representing the hue
 uint32_t R, G, B;           // the Red Green and Blue color components
@@ -176,8 +180,8 @@ void connectMQTT()
 
   while (!mqttClient.connected()) {
     Serial.printf(
-      "Attempting MQTT connection to \"%s\" \"%i\" as \"%s\" \"%s\"... ", 
-      config.server.c_str(), config.port, config.username.c_str(), config.password.c_str()
+      "Attempting MQTT connection to \"%s\" \"%i\" as \"%s\" ... ", 
+      config.server.c_str(), config.port, config.username.c_str() 
     );
     
     if (mqttClient.connect(
@@ -223,7 +227,7 @@ void mqttCallback (char* p_topic, byte* p_message, unsigned int p_length)
 
   digitalWrite(BUILTIN_LED, HIGH);
   Serial.printf("INFO: New MQTT message: '%s'\n", p_topic);
-  Serial.println("  - INFO: Message: ");
+  Serial.print("INFO: Message: ");
   Serial.println(message);
 
   if (!String(config.command_topic).equals(p_topic)) {
@@ -247,10 +251,17 @@ void mqttCallback (char* p_topic, byte* p_message, unsigned int p_length)
 
       root.printTo(output);
 
-      Serial.println("  - DEBUG: Got valid state in object");
-      Serial.println(output);
-
       newState.state = (root["state"] == "ON") ? true : false;
+      Serial.printf("  - DEBUG: Got valid state: %i\n", newState.state);
+
+      if (root.containsKey("effect")) {
+        newState.effect = (const char*) root["effect"];
+        Serial.printf("  - DEBUG: Got effect: '%s'\n", newState.effect.c_str());
+        currentState.effect = newState.effect;
+      } else {
+        newState.effect = ""; // make sure we nuke effect when there is none.
+        currentState.effect = newState.effect;
+      }
 
       if (root.containsKey("color")) {
         JsonObject& color = root["color"].as<JsonObject>();
@@ -260,27 +271,42 @@ void mqttCallback (char* p_topic, byte* p_message, unsigned int p_length)
           return;
         }
 
-        Serial.println("Object got color.");
-        if (color.containsKey("r")) newState.color.r = color["r"];
-        if (color.containsKey("g")) newState.color.g = color["g"];
-        if (color.containsKey("b")) newState.color.b = color["b"]; 
-        if (color.containsKey("x")) newState.color.b = color["x"]; 
-        if (color.containsKey("y")) newState.color.b = color["y"]; 
-        if (color.containsKey("h")) newState.color.b = color["h"]; 
-        if (color.containsKey("s")) newState.color.b = color["s"]; 
+        if (color.containsKey("r")) newState.color.r = (uint8_t) color["r"];
+        if (color.containsKey("g")) newState.color.g = (uint8_t) color["g"];
+        if (color.containsKey("b")) newState.color.b = (uint8_t) color["b"]; 
+        if (color.containsKey("x")) newState.color.x = (float) color["x"]; 
+        if (color.containsKey("y")) newState.color.y = (float) color["y"]; 
+        if (color.containsKey("h")) newState.color.h = (float) color["h"]; 
+        if (color.containsKey("s")) newState.color.s = (float) color["s"]; 
+
+        Serial.printf(
+          "  - DEBUG: Got color: R:%i, G:%i, B:%i,   X:%0.2f, Y:%0.2f,   H:%0.2f, S:%0.2f\n", 
+          newState.color.r, newState.color.g, newState.color.b, newState.color.x, 
+          newState.color.y, newState.color.h, newState.color.s
+        );
+
+        setLedToRGB(newState.color.r, newState.color.g, newState.color.b);
       } 
-      else {
-        Serial.println("  - DEBUG: Did not get color");
+
+      if (root.containsKey("brightness")) {
+        newState.brightness = root["brightness"];
+        Serial.printf("  - DEBUG: Got brightness: %i\n", newState.brightness);
+      } 
+
+      if (root.containsKey("color_temp")) {
+        newState.color_temp = root["color_temp"];
+        Serial.printf("  - DEBUG: Got color_temp: %i\n", newState.color_temp);
+      } 
+
+      if (root.containsKey("white_value")) {
+        newState.white_value = root["white_value"];
+        Serial.printf("  - DEBUG: Got white_value: %i\n", newState.white_value);
       }
 
-      Serial.print("state is: ");
-      Serial.println(newState.state);
-      Serial.print("R:");
-      Serial.print(newState.color.r);
-      Serial.print(", G:");
-      Serial.print(newState.color.g);
-      Serial.print(", B:");
-      Serial.print(newState.color.b);
+      if (root.containsKey("transition")) {
+        newState.transition = (uint16_t) root["transition"];
+        Serial.printf("  - DEBUG: Got transition: %i, newState.transition");
+      }
 
       mqttClient.publish(config.state_topic.c_str(), output.c_str(), true);
     }
@@ -296,14 +322,13 @@ void setupLeds()
 {
   // Starting led setup
   // initialize the digital pin as an output.
-  ledcAttachPin(red, 1);
-  ledcAttachPin(green, 2);
-  ledcAttachPin(blue, 3);
+  ledcAttachPin(GPIO_RED,   LEDC_RED);
+  ledcAttachPin(GPIO_GREEN, LEDC_GREEN);
+  ledcAttachPin(GPIO_BLUE,  LEDC_BLUE);
 
-  ledcSetup(1, 12000, 8);
-  ledcSetup(2, 12000, 8);
-  ledcSetup(3, 12000, 8);
-
+  ledcSetup(LEDC_RED,   12000, 8);
+  ledcSetup(LEDC_GREEN, 12000, 8);
+  ledcSetup(LEDC_BLUE,  12000, 8);
 }
 
 void setup()
@@ -321,6 +346,10 @@ void setup()
     return;
   }
 
+  currentState = {0}; // initialize state with all zeros.
+  currentState.effect = "colorloop";
+
+  Serial.printf("  - INFO: effect is set to '%s'\n", currentState.effect.c_str());
 
   readConfig();
   readCA();
@@ -343,22 +372,23 @@ void loop() {
     connectMQTT();
   }
 
-/*
-  Serial.print("Free heap: ");
-  Serial.print(ESP.getFreeHeap()); // 182796
-  Serial.print(", Cycle count: ");
-  Serial.println(ESP.getCycleCount());
-*/
-
   mqttClient.loop();
 
-  counter++;
-
-  setLed();
-  delay(10);
+  if (currentState.effect.equals("colorloop")) {
+    runEffectColorloop();
+  }
+  delay(33);
 }
 
-void setLed() {
+void setLedToRGB(uint8_t r, uint8_t g, uint8_t b) {
+  Serial.printf("DEBUG: Setting led to color: [%i, %i, %i]\n", r, g, b);
+  ledcWrite(LEDC_RED, r);
+  ledcWrite(LEDC_GREEN, g);
+  ledcWrite(LEDC_BLUE, b);
+}
+
+void runEffectColorloop() {
+  counter++;
   if (counter > 255) {
     counter = 0;
   } 
