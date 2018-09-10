@@ -1,6 +1,10 @@
 /**
  *  Creating a library file for LedShelf to clean up main file
  */
+
+#include <Arduino.h>
+#include <ArduinoJson.h>
+
 typedef struct Config {
   String ssid;
   String psk;
@@ -33,3 +37,8 @@ typedef struct LightState {
   String effect;
   bool state;
 } LightState;
+
+
+Color getColorFromJson(JsonObject& root);
+LightState getLightStateFromMQTT(byte * message);
+const char* createJsonString(LightState& state);
