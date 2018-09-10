@@ -47,37 +47,37 @@ uint8_t brightness = 255;
 
 void readConfig()
 {
-  const char* path = "/config.json";
-  String data;
+    const char* path = "/config.json";
+    String data;
 
-  Serial.printf("Reading config file: %s\r\n", path);
+    Serial.printf("Reading config file: %s\r\n", path);
 
-  File file = SPIFFS.open(path, "r");
-  if(!file) {
-    Serial.println("  - failed to open file for reading");
-    return;
-  }
+    File file = SPIFFS.open(path, "r");
+    if(!file) {
+        Serial.println("  - failed to open file for reading");
+        return;
+    }
 
-  StaticJsonBuffer<512> configBuffer;
-  JsonObject& root = configBuffer.parseObject(file);
+    StaticJsonBuffer<512> configBuffer;
+    JsonObject& root = configBuffer.parseObject(file);
 
-  if (!root.success()) {
-    Serial.println("  - parsing jsonBuffer failed");
-    return;
-  }
+    if (!root.success()) {
+        Serial.println("  - parsing jsonBuffer failed");
+        return;
+    }
 
-  config.ssid          = (const char*) root["ssid"];
-  config.psk           = (const char*) root["psk"];
-  config.server        = (const char*) root["server"];
-  config.port          = (int)         root["port"];
-  config.username      = (const char*) root["username"];
-  config.password      = (const char*) root["password"];
-  config.client        = (const char*) root["client"];
-  config.command_topic = (const char*) root["command_topic"];
-  config.state_topic   = (const char*) root["state_topic"];
-  config.status_topic  = (const char*) root["status_topic"];
+    config.ssid          = (const char*) root["ssid"];
+    config.psk           = (const char*) root["psk"];
+    config.server        = (const char*) root["server"];
+    config.port          = (int)         root["port"];
+    config.username      = (const char*) root["username"];
+    config.password      = (const char*) root["password"];
+    config.client        = (const char*) root["client"];
+    config.command_topic = (const char*) root["command_topic"];
+    config.state_topic   = (const char*) root["state_topic"];
+    config.status_topic  = (const char*) root["status_topic"];
 
-  file.close();
+    file.close();
 }
 
 /**
@@ -152,99 +152,34 @@ String mqttPaylodToString(byte* p_payload, unsigned int p_length)
 
 void mqttCallback (char* p_topic, byte* p_message, unsigned int p_length)
 {
-  String message = mqttPaylodToString(p_message, p_length);
+    digitalWrite(BUILTIN_LED, HIGH);
 
-  digitalWrite(BUILTIN_LED, HIGH);
-  Serial.printf("INFO: New MQTT message: '%s'\n", p_topic);
-  Serial.print("INFO: Message: ");
-  Serial.println(message);
 
-  if (!String(config.command_topic).equals(p_topic)) {
-    Serial.printf("  - ERROR: Not a valid topic: '%s'. IGNORING\n", p_topic);
-    return;
-  }
+    Serial.printf("INFO: New MQTT message: '%s' refactor\n", p_topic);
 
-  if (String(config.command_topic).equals(p_topic)) {
-    StaticJsonBuffer<420> jsonBuffer;
-    JsonObject& root = jsonBuffer.parseObject(p_message);
-
-    if (!root.success()) {
-      Serial.println("ERROR: parseobject failed.");
-      digitalWrite(BUILTIN_LED, LOW);
-      return;
+    if (!String(config.command_topic).equals(p_topic)) {
+        Serial.printf("  - ERROR: Not a valid topic: '%s'. IGNORING\n", p_topic);
+        digitalWrite(BUILTIN_LED, LOW);
+        return;
     }
 
-    if (root.containsKey("state")) {
-      String output;
-      LightState newState = {0};
+    LightState newState = getLightStateFromMQTT(p_message); // Creating empty struct for state
 
-      root.printTo(output);
+    Serial.printf("DEBUG: this is effect: '%s' %i\n", newState.effect.c_str(), newState.effect.length());
 
-      newState.state = (root["state"] == "ON") ? true : false;
-      Serial.printf("  - DEBUG: Got valid state: %i\n", newState.state);
-
-      if (root.containsKey("effect")) {
-        newState.effect = (const char*) root["effect"];
-        Serial.printf("  - DEBUG: Got effect: '%s'\n", newState.effect.c_str());
-        currentState.effect = newState.effect;
-      } else {
-        newState.effect = ""; // make sure we nuke effect when there is none.
-        currentState.effect = newState.effect;
-      }
-
-      if (root.containsKey("color")) {
-        JsonObject& color = root["color"].as<JsonObject>();
-        if (!color.success()) {
-          Serial.println("ERROR: invalid color statement found. Skipping");
-          digitalWrite(BUILTIN_LED, LOW);
-          return;
-        }
-
-        if (color.containsKey("r")) newState.color.r = (uint8_t) color["r"];
-        if (color.containsKey("g")) newState.color.g = (uint8_t) color["g"];
-        if (color.containsKey("b")) newState.color.b = (uint8_t) color["b"]; 
-        if (color.containsKey("x")) newState.color.x = (float) color["x"]; 
-        if (color.containsKey("y")) newState.color.y = (float) color["y"]; 
-        if (color.containsKey("h")) newState.color.h = (float) color["h"]; 
-        if (color.containsKey("s")) newState.color.s = (float) color["s"]; 
-
-        Serial.printf(
-          "  - DEBUG: Got color: R:%i, G:%i, B:%i,   X:%0.2f, Y:%0.2f,   H:%0.2f, S:%0.2f\n", 
-          newState.color.r, newState.color.g, newState.color.b, newState.color.x, 
-          newState.color.y, newState.color.h, newState.color.s
-        );
-
+    if (newState.effect.equals("")) {
         setLedToRGB(newState.color.r, newState.color.g, newState.color.b);
-      } 
-
-      if (root.containsKey("brightness")) {
-        newState.brightness = root["brightness"];
-        Serial.printf("  - DEBUG: Got brightness: %i\n", newState.brightness);
-      } 
-
-      if (root.containsKey("color_temp")) {
-        newState.color_temp = root["color_temp"];
-        Serial.printf("  - DEBUG: Got color_temp: %i\n", newState.color_temp);
-      } 
-
-      if (root.containsKey("white_value")) {
-        newState.white_value = root["white_value"];
-        Serial.printf("  - DEBUG: Got white_value: %i\n", newState.white_value);
-      }
-
-      if (root.containsKey("transition")) {
-        newState.transition = (uint16_t) root["transition"];
-        Serial.printf("  - DEBUG: Got transition: %i\n", newState.transition);
-      }
-
-      mqttClient.publish(config.state_topic.c_str(), output.c_str(), true);
     }
-    else {
-      Serial.println("WARN: Got something else. Stopping parsing.");
-    }
-  }
 
-  digitalWrite(BUILTIN_LED, LOW);
+    const char* newStateJson = createJsonString(newState);
+
+    Serial.println("DEBUG: Done JSON:");
+    Serial.println(newStateJson);
+
+    // TOOD: currentState.effect = state.effect;
+    // TODO: fix proper store and publish of state
+    // mqttClient.publish(config.state_topic.c_str(), output.c_str(), true);
+    digitalWrite(BUILTIN_LED, LOW);
 }
 
 void setupMQTT()
