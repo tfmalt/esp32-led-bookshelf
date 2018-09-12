@@ -41,4 +41,4 @@ typedef struct LightState {
 
 Color getColorFromJson(JsonObject& root);
 LightState getLightStateFromMQTT(byte * message);
-const char* createJsonString(LightState& state);
+String createJsonString(LightState& state);

@@ -11,8 +11,8 @@
  * 
  * Copyright (c) 2018 Thomas Malt
  */
-#define MQTT_MAX_PACKET_SIZE 256
-
+#define MQTT_MAX_PACKET_SIZE 512
+#define MQTT_MAX_TRANSFER_SIZE 512
 #include <Arduino.h>
 #include <FS.h>
 #include <SPIFFS.h>
@@ -173,14 +173,21 @@ void mqttCallback (char* p_topic, byte* p_message, unsigned int p_length)
         setLedToRGB(newState.color.r, newState.color.g, newState.color.b);
     }
 
-    const char* newStateJson = createJsonString(newState);
+    String newStateJson = createJsonString(newState);
+    byte output[256];
+    newStateJson.getBytes(output, 256);
+    int length = sizeof(newStateJson.c_str());
     Serial.println("DEBUG: Done JSON:");
-    Serial.printf("%s\n", newStateJson)
-    Serial.println(String(newStateJson).length());
+    Serial.println(newStateJson);
+    Serial.println(length);
+    Serial.println(newStateJson.length());
+    Serial.println(MQTT_MAX_TRANSFER_SIZE);
+    Serial.println(MQTT_MAX_PACKET_SIZE);
 
     // TOOD: currentState.effect = state.effect;
     // TODO: fix proper store and publish of state
-    mqttClient.publish(config.state_topic.c_str(), newStateJson, true);
+    mqttClient.publish(config.state_topic.c_str(), newStateJson.c_str(), true);
+    // mqttClient.publish(config.state_topic.c_str(), "{\"state\": \"ON\", \"testing\": \"Yes\"}", true);
     digitalWrite(BUILTIN_LED, LOW);
 }
 
