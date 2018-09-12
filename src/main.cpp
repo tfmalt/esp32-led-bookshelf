@@ -32,6 +32,8 @@ PubSubClient     mqttClient;
 
 uint8_t counter = 0;
 
+#define MQTT_MAX_PACKET_SIZE 256;
+
 // led GPIOs
 #define GPIO_RED   25
 #define GPIO_GREEN 26
@@ -172,13 +174,13 @@ void mqttCallback (char* p_topic, byte* p_message, unsigned int p_length)
     }
 
     const char* newStateJson = createJsonString(newState);
-
     Serial.println("DEBUG: Done JSON:");
-    Serial.println(newStateJson);
+    Serial.printf("%s\n", newStateJson)
+    Serial.println(String(newStateJson).length());
 
     // TOOD: currentState.effect = state.effect;
     // TODO: fix proper store and publish of state
-    // mqttClient.publish(config.state_topic.c_str(), output.c_str(), true);
+    mqttClient.publish(config.state_topic.c_str(), newStateJson, true);
     digitalWrite(BUILTIN_LED, LOW);
 }
 
