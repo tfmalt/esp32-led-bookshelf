@@ -15,13 +15,13 @@ Color getColorFromJson(JsonObject& root) {
         return color;
     }
 
-    if (cJson.containsKey("r")) color.r = (uint8_t) cJson["r"];
-    if (cJson.containsKey("g")) color.g = (uint8_t) cJson["g"];
-    if (cJson.containsKey("b")) color.b = (uint8_t) cJson["b"]; 
-    if (cJson.containsKey("x")) color.x = (float) cJson["x"]; 
-    if (cJson.containsKey("y")) color.y = (float) cJson["y"]; 
-    if (cJson.containsKey("h")) color.h = (float) cJson["h"]; 
-    if (cJson.containsKey("s")) color.s = (float) cJson["s"]; 
+    color.r = (uint8_t) cJson["r"];
+    color.g = (uint8_t) cJson["g"];
+    color.b = (uint8_t) cJson["b"]; 
+    color.x = (float) cJson["x"]; 
+    color.y = (float) cJson["y"]; 
+    color.h = (float) cJson["h"]; 
+    color.s = (float) cJson["s"]; 
 
     return color; 
 }
@@ -55,8 +55,6 @@ LightState getLightStateFromMQTT(byte* message) {
     if (root.containsKey("effect")) {
         state.effect = (const char*) root["effect"];
         Serial.printf("  - DEBUG: Got effect: '%s'\n", state.effect.c_str());
-    } else {
-        state.effect = ""; // make sure we nuke effect when there is none.
     }
 
     // Color
@@ -68,10 +66,8 @@ LightState getLightStateFromMQTT(byte* message) {
     );
     
     // Brightness
-    if (root.containsKey("brightness")) {
-        state.brightness = root["brightness"];
-        Serial.printf("  - DEBUG: Got brightness: %i\n", state.brightness);
-    } 
+    state.brightness = root["brightness"];
+    Serial.printf("  - DEBUG: Got brightness: %i\n", state.brightness);
 
     // Color temperature
     if (root.containsKey("color_temp")) {
@@ -97,11 +93,24 @@ LightState getLightStateFromMQTT(byte* message) {
 const char* createJsonString(LightState& state) {
     StaticJsonBuffer<420> jsonBuffer;
     JsonObject& object = jsonBuffer.createObject();
-    // object["hello"] = "world";j
+    JsonObject& color = jsonBuffer.createObject();
 
-    object["state"] = (state.state) ? "ON" : "OFF"; 
-    object["brightness"] = state.brightness;
+    color["r"] = state.color.r;
+    color["g"] = state.color.g;
+    color["b"] = state.color.b;
+    color["x"] = state.color.x;
+    color["y"] = state.color.y;
+    color["h"] = state.color.h;
+    color["s"] = state.color.s;
+
+    object["state"]       = (state.state) ? "ON" : "OFF"; 
+    object["brightness"]  = state.brightness;
+    object["color_temp"]  = state.color_temp;
+    object["white_value"] = state.white_value;
+    object["color"]       = color;
+    object["effect"]      = state.effect.c_str();
+
     String output;
     object.printTo(output);
-    return output.c_str();
+    return (const char*) output.c_str();
 }
