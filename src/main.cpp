@@ -11,12 +11,13 @@
  * 
  * Copyright (c) 2018 Thomas Malt
  */
+#define MQTT_MAX_PACKET_SIZE 256
 
 #include <Arduino.h>
 #include <FS.h>
 #include <SPIFFS.h>
 #include <ArduinoJson.h>
-#include <WiFi.h>
+// #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <PubSubClient.h>
 #include <LedShelf.h>
@@ -42,6 +43,7 @@ uint8_t counter = 0;
 #define LEDC_RED    1
 #define LEDC_GREEN  2
 #define LEDC_BLUE   3
+
 
 uint8_t color = 0;          // a value from 0 to 255 representing the hue
 uint32_t R, G, B;           // the Red Green and Blue color components
@@ -297,18 +299,13 @@ void hueToRGB(uint8_t hue, uint8_t brightness)
 }
 
 void runEffectColorloop() {
-  counter++;
-  if (counter > 255) {
-    counter = 0;
-  } 
+    counter++;
+    if (counter > 255) counter = 0;
 
-  hueToRGB(counter, brightness);
-
-  // Serial.printf("counter: %i, [%i, %i, %i]\n", counter, R, G, B);
-
-  ledcWrite(1, R);
-  ledcWrite(2, G);
-  ledcWrite(3, B);
+    hueToRGB(counter, brightness);
+    ledcWrite(1, R);
+    ledcWrite(2, G);
+    ledcWrite(3, B);
 }
 
 void setup()
