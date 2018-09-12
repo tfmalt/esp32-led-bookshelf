@@ -33,8 +33,6 @@ PubSubClient     mqttClient;
 
 uint8_t counter = 0;
 
-#define MQTT_MAX_PACKET_SIZE 256;
-
 // led GPIOs
 #define GPIO_RED   25
 #define GPIO_GREEN 26
