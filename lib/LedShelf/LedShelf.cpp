@@ -7,7 +7,7 @@ Color getColorFromJson(JsonObject& root) {
         Serial.println("DEBUG: Message does not have color.");
         return color;
     }
-        
+
     JsonObject& cJson = root["color"].as<JsonObject>();
 
     if (!cJson.success()) {
@@ -17,11 +17,11 @@ Color getColorFromJson(JsonObject& root) {
 
     color.r = (uint8_t) cJson["r"];
     color.g = (uint8_t) cJson["g"];
-    color.b = (uint8_t) cJson["b"]; 
-    color.h = (float) cJson["h"]; 
-    color.s = (float) cJson["s"]; 
+    color.b = (uint8_t) cJson["b"];
+    color.h = (float) cJson["h"];
+    color.s = (float) cJson["s"];
 
-    return color; 
+    return color;
 }
 
 LightState getLightStateFromMQTT(byte* message) {
@@ -52,17 +52,17 @@ LightState getLightStateFromMQTT(byte* message) {
     // Effect
     if (root.containsKey("effect")) {
         state.effect = (const char*) root["effect"];
-        Serial.printf("  - DEBUG: Got effect: '%s'\n", state.effect.c_str());
+        Serial.printf("  - DEBUG: Got effect: '%s'\n", state.effect);
     }
 
     // Color
     state.color = getColorFromJson(root);
     Serial.printf(
-        "  - DEBUG: Got color: R:%i, G:%i, B:%i,   H:%0.2f, S:%0.2f\n", 
-        state.color.r, state.color.g, state.color.b, 
+        "  - DEBUG: Got color: R:%i, G:%i, B:%i,   H:%0.2f, S:%0.2f\n",
+        state.color.r, state.color.g, state.color.b,
         state.color.h, state.color.s
     );
-    
+
     // Brightness
     state.brightness = root["brightness"];
     Serial.printf("  - DEBUG: Got brightness: %i\n", state.brightness);
@@ -87,10 +87,10 @@ String createJsonString(LightState& state) {
     color["h"] = state.color.h;
     color["s"] = state.color.s;
 
-    object["state"]       = (state.state) ? "ON" : "OFF"; 
+    object["state"]       = (state.state) ? "ON" : "OFF";
     object["brightness"]  = state.brightness;
     object["color"]       = color;
-    object["effect"]      = state.effect.c_str();
+    object["effect"]      = state.effect;
 
     String output = "";
     object.printTo(output);

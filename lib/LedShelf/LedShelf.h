@@ -4,6 +4,7 @@
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
+#include <LightStateController.h>
 
 typedef struct Config {
   String ssid;
@@ -17,26 +18,6 @@ typedef struct Config {
   String state_topic;
   String status_topic;
 } Config;
-
-typedef struct Color {
-  uint8_t r;
-  uint8_t g;
-  uint8_t b;
-  float x;
-  float y;
-  float h;
-  float s;
-} Color;
-
-typedef struct LightState {
-  uint8_t brightness;
-  uint8_t color_temp; 
-  uint8_t white_value;
-  uint16_t transition;
-  Color color;
-  String effect;
-  bool state;
-} LightState;
 
 
 Color getColorFromJson(JsonObject& root);
