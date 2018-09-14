@@ -1,18 +1,19 @@
 /*
  * A first attempt at writing code for ESP32.
  * This is going to be a led light controller for lights on my daughters book shelf.
- * 
+ *
  * - Uses MQTT over TLS to talk to a MQTT broker.
- * - Implementes the mqtt_json interface to get commands from a home assistant 
+ * - Implementes the mqtt_json interface to get commands from a home assistant
  *   server. (https://home-assistant.io)
  * - Uses SPIFFS to store configuration and separate configuration from firmware
- * 
+ *
  * MIT License
- * 
+ *
  * Copyright (c) 2018 Thomas Malt
  */
-#define MQTT_MAX_PACKET_SIZE 512
-#define MQTT_MAX_TRANSFER_SIZE 512
+#define MQTT_MAX_PACKET_SIZE 256
+#define MQTT_MAX_TRANSFER_SIZE 256
+
 #include <Arduino.h>
 #include <FS.h>
 #include <SPIFFS.h>
@@ -27,7 +28,7 @@ String ca_root;
 
 // global objects
 Config           config;
-LightState       currentState;
+LightState       LightStateController;
 WiFiClientSecure wifiClient;
 PubSubClient     mqttClient;
 
@@ -85,7 +86,7 @@ void readConfig()
 /**
  * Reads the TLS CA Root Certificate from file.
  */
-void readCA() 
+void readCA()
 {
   const char* path = "/ca.pem";
 
@@ -110,14 +111,14 @@ void readCA()
 /**
  * Configure and setup wifi
  */
-void setupWifi() 
+void setupWifi()
 {
   digitalWrite(BUILTIN_LED, LOW);
 
   delay(10);
 
   Serial.printf("Connecting to: %s ", config.ssid.c_str());
-  
+
   WiFi.begin(config.ssid.c_str(), config.psk.c_str());
 
   while (WiFi.status() != WL_CONNECTED) {
@@ -167,25 +168,31 @@ void mqttCallback (char* p_topic, byte* p_message, unsigned int p_length)
 
     LightState newState = getLightStateFromMQTT(p_message); // Creating empty struct for state
 
-    Serial.printf("DEBUG: this is effect: '%s' %i\n", newState.effect.c_str(), newState.effect.length());
+    Serial.printf("DEBUG: this is effect: '%s' %i\n", newState.effect, strlen(newState.effect));
 
-    if (newState.effect.equals("")) {
+    if (strlen(newState.effect) == 0) {
         setLedToRGB(newState.color.r, newState.color.g, newState.color.b);
     }
 
     String newStateJson = createJsonString(newState);
-    byte output[256];
-    newStateJson.getBytes(output, 256);
-    int length = sizeof(newStateJson.c_str());
+
+    // debug code
     Serial.println("DEBUG: Done JSON:");
     Serial.println(newStateJson);
-    Serial.println(length);
-    Serial.println(newStateJson.length());
-    Serial.println(MQTT_MAX_TRANSFER_SIZE);
-    Serial.println(MQTT_MAX_PACKET_SIZE);
+
+    int length = strlen(newStateJson.c_str());
+    int t_length = strlen(config.state_topic.c_str());
+    int total = 5 + 2 + t_length + length;
+
+    Serial.printf("payload length: %i\n", length);
+    Serial.printf("packet length: %i\n", total);
+    Serial.printf("transfer size: %i\n", MQTT_MAX_TRANSFER_SIZE);
+    Serial.printf("packet size: %i\n", MQTT_MAX_PACKET_SIZE);
+
 
     // TOOD: currentState.effect = state.effect;
     // TODO: fix proper store and publish of state
+     // if (MQTT_MAX_PACKET_SIZE < 5 + 2+strlen(topic) + plength) {
     mqttClient.publish(config.state_topic.c_str(), newStateJson.c_str(), true);
     // mqttClient.publish(config.state_topic.c_str(), "{\"state\": \"ON\", \"testing\": \"Yes\"}", true);
     digitalWrite(BUILTIN_LED, LOW);
@@ -193,16 +200,16 @@ void mqttCallback (char* p_topic, byte* p_message, unsigned int p_length)
 
 void setupMQTT()
 {
-  wifiClient.setCACert(ca_root.c_str());
+    wifiClient.setCACert(ca_root.c_str());
 
-  Serial.printf("Setting up MQTT Client: %s %i\n", config.server.c_str(), config.port);
+    Serial.printf("Setting up MQTT Client: %s %i\n", config.server.c_str(), config.port);
 
-  mqttClient.setClient(wifiClient);
-  mqttClient.setServer(config.server.c_str(), config.port); 
-  mqttClient.setCallback(mqttCallback);
+    mqttClient.setClient(wifiClient);
+    mqttClient.setServer(config.server.c_str(), config.port);
+    mqttClient.setCallback(mqttCallback);
 }
 
-void connectMQTT() 
+void connectMQTT()
 {
   digitalWrite(BUILTIN_LED, HIGH);
   IPAddress mqttip;
@@ -213,15 +220,15 @@ void connectMQTT()
 
   while (!mqttClient.connected()) {
     Serial.printf(
-      "Attempting MQTT connection to \"%s\" \"%i\" as \"%s\" ... ", 
-      config.server.c_str(), config.port, config.username.c_str() 
+      "Attempting MQTT connection to \"%s\" \"%i\" as \"%s\" ... ",
+      config.server.c_str(), config.port, config.username.c_str()
     );
-    
+
     if (mqttClient.connect(
-      config.client.c_str(), 
-      config.username.c_str(), 
-      config.password.c_str(), 
-      config.status_topic.c_str(), 
+      config.client.c_str(),
+      config.username.c_str(),
+      config.password.c_str(),
+      config.status_topic.c_str(),
       0, true, "Disconnected")
     ) {
       Serial.println(" connected");
@@ -231,8 +238,8 @@ void connectMQTT()
       Serial.println(config.command_topic);
       mqttClient.publish(config.status_topic.c_str(), "Online", true);
       mqttClient.subscribe(config.command_topic.c_str());
-    } 
-    else {  
+    }
+    else {
       Serial.print(" failed: ");
       Serial.println(mqttClient.state());
       delay(5000);
@@ -331,7 +338,7 @@ void setup()
   currentState = {0}; // initialize state with all zeros.
   currentState.effect = "colorloop";
 
-  Serial.printf("  - INFO: effect is set to '%s'\n", currentState.effect.c_str());
+  Serial.printf("  - INFO: effect is set to '%s'\n", currentState.effect);
 
   readConfig();
   readCA();
@@ -356,7 +363,7 @@ void loop() {
 
   mqttClient.loop();
 
-  if (currentState.effect.equals("colorloop")) {
+  if (strcmp(currentState.effect, "colorloop") == 0) {
     runEffectColorloop();
   }
   delay(33);
