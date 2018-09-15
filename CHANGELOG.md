@@ -8,3 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Created initial repository
 - Added work in progress code that runs but is incomplete
+- Firmware is configurable through date/config.json
+- Connects to mqtt broker over TLS on port 8883
+- Works with home assistant as a mqtt_json light.
+- supports RGB and HS color settings
+- Implements 'colorloop' effect
