@@ -14,11 +14,11 @@
 #define MQTT_MAX_PACKET_SIZE 256
 #define MQTT_MAX_TRANSFER_SIZE 256
 
+#include <debug.h>
 #include <Arduino.h>
 #include <FS.h>
 #include <SPIFFS.h>
 #include <ArduinoJson.h>
-// #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <PubSubClient.h>
 #include <LedShelf.h>
@@ -30,7 +30,6 @@ String ca_root;
 // global objects
 Config                config;
 LightStateController  lightState;
-LightState            currentState;
 WiFiClientSecure      wifiClient;
 PubSubClient          mqttClient;
 
@@ -92,19 +91,19 @@ void readCA()
 {
     const char* path = "/ca.pem";
     Serial.printf("Reading CA file: %s\n", path);
-  
+
     File file = SPIFFS.open(path, "r");
-  
+
     if (!file) {
         Serial.printf("  - Failed to open %s for reading\n", path);
         return;
     }
-  
+
     ca_root = "";
     while (file.available()) {
         ca_root += file.readString();
     }
-  
+
     file.close();
 }
 
@@ -115,20 +114,20 @@ void readCA()
 void setupWifi()
 {
     digitalWrite(BUILTIN_LED, LOW);
-  
+
     delay(10);
-  
+
     Serial.printf("Connecting to: %s ", config.ssid.c_str());
-  
+
     WiFi.begin(config.ssid.c_str(), config.psk.c_str());
-  
+
     while (WiFi.status() != WL_CONNECTED) {
         digitalWrite(BUILTIN_LED, HIGH);
         Serial.print(".");
         delay(500);
         digitalWrite(BUILTIN_LED, LOW);
     }
-  
+
     Serial.println(" WiFi connected");
     Serial.print("  - IP address: ");
     Serial.println(WiFi.localIP());
@@ -146,11 +145,11 @@ void setLedToRGB(uint8_t r, uint8_t g, uint8_t b) {
 String mqttPaylodToString(byte* p_payload, unsigned int p_length)
 {
     String message;
-  
+
     for (uint8_t i = 0; i < p_length; i++) {
         message.concat( (char) p_payload[i] );
     }
-  
+
     return message;
 }
 
@@ -166,35 +165,38 @@ void mqttCallback (char* p_topic, byte* p_message, unsigned int p_length)
         return;
     }
 
-    uint8_t result = lightState.newState(p_message);
+    LightState newState = lightState.newState(p_message);
     // LightState newState = getLightStateFromMQTT(p_message); // Creating empty struct for state
 
-    // Serial.printf("DEBUG: this is effect: '%s' %i\n", newState.effect, strlen(newState.effect));
+    Serial.printf(
+        "DEBUG: this is effect: '%s' %i\n",
+        newState.effect, strlen(newState.effect)
+    );
 
     // if (strlen(newState.effect) == 0) {
     //     setLedToRGB(newState.color.r, newState.color.g, newState.color.b);
     // }
 
-    String newStateJson = createJsonString(newState);
+    // String newStateJson = createJsonString(newState);
 
     // debug code
-    Serial.println("DEBUG: Done JSON:");
-    Serial.println(newStateJson);
+    // Serial.println("DEBUG: Done JSON:");
+    // Serial.println(newStateJson);
 
-    int length = strlen(newStateJson.c_str());
-    int t_length = strlen(config.state_topic.c_str());
-    int total = 5 + 2 + t_length + length;
+    // int length = strlen(newStateJson.c_str());
+    // int t_length = strlen(config.state_topic.c_str());
+    // int total = 5 + 2 + t_length + length;
 
-    Serial.printf("payload length: %i\n", length);
-    Serial.printf("packet length: %i\n", total);
-    Serial.printf("transfer size: %i\n", MQTT_MAX_TRANSFER_SIZE);
-    Serial.printf("packet size: %i\n", MQTT_MAX_PACKET_SIZE);
+    // Serial.printf("payload length: %i\n", length);
+    // Serial.printf("packet length: %i\n", total);
+    // Serial.printf("transfer size: %i\n", MQTT_MAX_TRANSFER_SIZE);
+    // Serial.printf("packet size: %i\n", MQTT_MAX_PACKET_SIZE);
 
 
     // TOOD: currentState.effect = state.effect;
     // TODO: fix proper store and publish of state
-     // if (MQTT_MAX_PACKET_SIZE < 5 + 2+strlen(topic) + plength) {
-    mqttClient.publish(config.state_topic.c_str(), newStateJson.c_str(), true);
+    // if (MQTT_MAX_PACKET_SIZE < 5 + 2+strlen(topic) + plength) {
+    // mqttClient.publish(config.state_topic.c_str(), newStateJson.c_str(), true);
     // mqttClient.publish(config.state_topic.c_str(), "{\"state\": \"ON\", \"testing\": \"Yes\"}", true);
     digitalWrite(BUILTIN_LED, LOW);
 }
@@ -323,50 +325,60 @@ void runEffectColorloop() {
 
 void setup()
 {
+    Serial.begin(115200);
+    Serial.printf("Starting...\n");
+    //  lightState.setCurrentState("hello");
 
-  Serial.begin(115200);
-  Serial.printf("Starting...\n");
-  lightState.setCurrentState("hello");
+    pinMode(BUILTIN_LED, OUTPUT);
+    digitalWrite(BUILTIN_LED, LOW);
+    delay(100);
 
-  pinMode(BUILTIN_LED, OUTPUT);
-  digitalWrite(BUILTIN_LED, LOW);
-  delay(100);
+    if (!SPIFFS.begin()) {
+        Serial.println("  - Could not mount SPIFFS.");
+        return;
+    }
 
-  if (!SPIFFS.begin()) {
-    Serial.println("  - Could not mount SPIFFS.");
-    return;
-  }
+    uint8_t result = lightState.initialize();
+    LightState currentState  = lightState.getCurrentState();
+    #ifdef DEBUG
+    String resultString = "";
 
-  currentState = {0}; // initialize state with all zeros.
-  currentState.effect = "colorloop";
+    if (result == LIGHT_STATEFILE_PARSED_SUCCESS) resultString = "success";
+    if (result == LIGHT_STATEFILE_NOT_FOUND)      resultString = "file not found";
+    if (result == LIGHT_STATEFILE_JSON_FAILED)    resultString = "json failed";
 
-  Serial.printf("  - INFO: effect is set to '%s'\n", currentState.effect);
+    Serial.printf("  - state initialize: %s\n", resultString.c_str());
+    Serial.printf("  - current brightness: %i\n", currentState.brightness);
+    #endif
 
-  readConfig();
-  readCA();
-  setupWifi();
-  setupMQTT();
-  setupLeds();
+    Serial.printf("  - INFO: effect is set to '%s'\n", currentState.effect);
+
+    readConfig();
+    readCA();
+    setupWifi();
+    setupMQTT();
+    setupLeds();
 }
 
 void loop() {
-  // wait for WiFi connection
-  if((WiFi.status() != WL_CONNECTED)) {
-    Serial.println("WiFI not connected.");
-    setupWifi();
-    delay(500);
-    return;
-  }
+    // wait for WiFi connection
+    if((WiFi.status() != WL_CONNECTED)) {
+        Serial.println("WiFI not connected.");
+        setupWifi();
+        delay(500);
+        return;
+    }
 
-  if (!mqttClient.connected()) {
-    Serial.printf("Not connected to MQTT broker: %s\n", config.server.c_str());
-    connectMQTT();
-  }
+    if (!mqttClient.connected()) {
+        Serial.printf("Not connected to MQTT broker: %s\n", config.server.c_str());
+        connectMQTT();
+    }
 
-  mqttClient.loop();
+    LightState currentState = lightState.getCurrentState();
+    mqttClient.loop();
 
-  if (strcmp(currentState.effect, "colorloop") == 0) {
-    runEffectColorloop();
-  }
-  delay(33);
+    if (strcmp(currentState.effect, "colorloop") == 0) {
+        runEffectColorloop();
+    }
+    delay(33);
 }
