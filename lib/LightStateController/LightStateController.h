@@ -3,6 +3,7 @@
 #define LightStateController_h
 
 #include <Arduino.h>
+#include <ArduinoJson.h>
 
 #define LIGHT_STATEFILE_PARSED_SUCCESS  0
 #define LIGHT_STATEFILE_NOT_FOUND       1
@@ -20,16 +21,6 @@ typedef struct Color {
     float s;
 } Color;
 
-typedef struct LightState {
-    uint8_t brightness;
-    uint8_t white_value;
-    uint16_t color_temp;
-    uint16_t transition;
-    struct Color color;
-    const char* effect;
-    bool state;
-} LightState;
-
 typedef struct LightStatus {
     bool hasBrightness;
     bool hasWhiteValue;
@@ -38,18 +29,36 @@ typedef struct LightStatus {
     bool hasColor;
     bool hasEffect;
     bool hasState;
+    bool success;
+    uint8_t status;
 } LightStatus;
+
+typedef struct LightState {
+    uint8_t brightness;
+    uint8_t white_value;
+    uint16_t color_temp;
+    uint16_t transition;
+    Color color;
+    const char* effect;
+    bool state;
+    LightStatus status;
+} LightState;
 
 class LightStateController {
     private:
-        LightState currentState = {0};
+        LightState  currentState = {0};
+        LightState  defaultState = {0};
+
         const char* stateFile = "/lightState.json";
-        uint8_t parseStateFile();
+
+        Color       getColorFromJsonObject(JsonObject& root);
+        LightState  getLightStateFromPayload(byte* payload);
     public:
         LightStateController();
-        LightStateController(const char* stateString);
-        bool setCurrentState(const char* stateString);
-        uint8_t newState(byte* payload);
+        uint8_t    initialize();
+        bool       setCurrentState(const char* stateString);
+        LightState newState(byte* payload);
+        LightState getCurrentState();
 };
 
 #endif // LightStateControlller_h

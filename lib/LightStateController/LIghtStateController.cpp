@@ -1,15 +1,20 @@
 #include "LightStateController.h"
+#include <debug.h>
 #include <SPIFFS.h>
 #include <FS.h>
 #include <ArduinoJson.h>
 
 LightStateController::LightStateController() {
-    Serial.println("DEBUG: Light state controller debug.");
-    parseStateFile();
-}
+    Color defaultColor = {0};
 
-LightStateController::LightStateController(const char* stateString) {
+    LightStatus defaultStatus = {false};
+    defaultStatus.status = 255;
 
+    defaultState.color      = defaultColor;
+    defaultState.effect     = "";
+    defaultState.brightness = 255;
+    defaultState.state      = false;
+    defaultState.status     = defaultStatus;
 }
 
 bool LightStateController::setCurrentState(const char* stateString) {
@@ -19,7 +24,9 @@ bool LightStateController::setCurrentState(const char* stateString) {
     return true;
 }
 
-uint8_t LightStateController::parseStateFile() {
+uint8_t LightStateController::initialize() {
+    currentState = defaultState;
+
     File file = SPIFFS.open(stateFile, "r");
     if (!file) return LIGHT_STATEFILE_NOT_FOUND;
 
@@ -37,16 +44,136 @@ uint8_t LightStateController::parseStateFile() {
     currentState.brightness = root["brightness"] || 255;
     currentState.color_temp = root["color_temp"] || 200;
     currentState.transition = root["transition"] || 1;
-    
+
     return 0;
 }
 
-uint8_t LightStateController::newState(byte* payload) {
+LightState LightStateController::newState(byte* payload) {
+    LightState newState = getLightStateFromPayload(payload);
+
+    #ifdef DEBUG
+    Serial.println("DEBUG: got new LightState:");
+    Serial.printf(
+        "  - has state: %s, value: %s\n",
+        (newState.status.hasState ? "true" : "false"),
+        (newState.state) ? "On": "Off"
+    );
+    Serial.printf(
+        "  - has brightness: %s, value: %i\n",
+        (newState.status.hasBrightness ? "true" : "false"),
+        newState.brightness
+    );
+    Serial.printf(
+        "  - has color_temp: %s, value: %i\n",
+        (newState.status.hasColorTemp ? "true" : "false"),
+        newState.color_temp
+    );
+    Serial.printf(
+        "  - has transition: %s, value: %i\n",
+        (newState.status.hasTransition ? "true" : "false"),
+        newState.transition
+    );
+    Serial.printf(
+        "  - has effect: %s, value: '%s'\n",
+        (newState.status.hasEffect ? "true" : "false"),
+        newState.effect
+    );
+    Serial.printf("  - has color: %s, value: [%i,%i,%i,%0.2f,%0.2f]\n",
+        (newState.status.hasColor ? "true" : "false"),
+        newState.color.r, newState.color.g, newState.color.b,
+        newState.color.h, newState.color.s
+    );
+    #endif
+
+    return newState;
+}
+
+/**
+ * Takes a JsonObject reference and returns a color struct.
+ */
+Color LightStateController::getColorFromJsonObject(JsonObject& root) {
+    Color color = {0};
+
+    if (!root.containsKey("color")) return color;
+
+    JsonObject& cJson = root["color"].as<JsonObject>();
+
+    if (!cJson.success()) return color;
+
+    color.r = (uint8_t) cJson["r"];
+    color.g = (uint8_t) cJson["g"];
+    color.b = (uint8_t) cJson["b"];
+    color.h = (float) cJson["h"];
+    color.s = (float) cJson["s"];
+
+    return color;
+}
+
+LightState LightStateController::getLightStateFromPayload(byte* payload) {
     StaticJsonBuffer<256>   jsonBuffer;
     JsonObject&             root     = jsonBuffer.parseObject(payload);
-    LightState              newState = {0};
+    LightState              newState = currentState;
 
-    if (!root.success())            return LIGHT_MQTT_JSON_FAILED;
-    if (!root.containsKey("state")) return LIGHT_MQTT_JSON_NO_STATE;
+    newState.status = {false};
 
+    if (!root.success()) {
+        newState.status.status = LIGHT_MQTT_JSON_FAILED;
+        newState.status.success = false;
+        return newState;
+    }
+
+    char output[256] = "";
+    root.printTo(output, 256);
+
+    #ifdef DEBUG
+    Serial.printf("DEBUG: JSON: '%s'\n", output);
+    #endif
+
+    if (!root.containsKey("state")) {
+        newState.status.status = LIGHT_MQTT_JSON_NO_STATE;
+        newState.status.success = false;
+        return newState;
+    }
+
+    newState.state = root["state"] == "ON" ? true : false;
+    newState.status.hasState = true;
+
+    if (root.containsKey("brightness")) {
+        newState.status.hasBrightness = true;
+        newState.brightness = root["brightness"];
+    }
+
+    if (root.containsKey("white_value")) {
+        newState.status.hasWhiteValue = true;
+        newState.white_value = root["white_value"];
+    }
+
+    if (root.containsKey("color_temp")) {
+        newState.status.hasColorTemp = true;
+        newState.color_temp = root["color_temp"];
+    }
+
+    if (root.containsKey("transition")) {
+        newState.status.hasTransition = true;
+        newState.transition = root["transition"];
+    }
+
+    if (root.containsKey("effect")) {
+        newState.status.hasEffect = true;
+        newState.effect = root["effect"];
+    } else {
+        newState.effect = "";
+    }
+
+    if (root.containsKey("color")) {
+        newState.status.hasColor = true;
+        newState.color = getColorFromJsonObject(root);
+    }
+
+    newState.status.success = true;
+    return newState;
+}
+
+LightState LightStateController::getCurrentState() {
+    return currentState;
 }
