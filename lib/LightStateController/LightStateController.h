@@ -53,6 +53,7 @@ class LightStateController {
 
         Color       getColorFromJsonObject(JsonObject& root);
         LightState  getLightStateFromPayload(byte* payload);
+        void        printStateDebug(LightState& state);
     public:
         LightStateController();
         uint8_t    initialize();

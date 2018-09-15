@@ -11,8 +11,9 @@ LightStateController::LightStateController() {
     defaultStatus.status = 255;
 
     defaultState.color      = defaultColor;
-    defaultState.effect     = "";
+    defaultState.effect     = "colorloop";
     defaultState.brightness = 255;
+    defaultState.transition = 1;
     defaultState.state      = false;
     defaultState.status     = defaultStatus;
 }
@@ -43,7 +44,6 @@ uint8_t LightStateController::initialize() {
     currentState.effect     = (const char*) root["effect"];
     currentState.brightness = root["brightness"] || 255;
     currentState.color_temp = root["color_temp"] || 200;
-    currentState.transition = root["transition"] || 1;
 
     return 0;
 }
@@ -52,40 +52,48 @@ LightState LightStateController::newState(byte* payload) {
     LightState newState = getLightStateFromPayload(payload);
 
     #ifdef DEBUG
+    printStateDebug(newState);
+    #endif
+
+
+    currentState = newState;
+    return newState;
+}
+
+void LightStateController::printStateDebug(LightState& state) {
+    #ifdef DEBUG
     Serial.println("DEBUG: got new LightState:");
     Serial.printf(
         "  - has state: %s, value: %s\n",
-        (newState.status.hasState ? "true" : "false"),
-        (newState.state) ? "On": "Off"
+        (state.status.hasState ? "true" : "false"),
+        (state.state) ? "On": "Off"
     );
     Serial.printf(
         "  - has brightness: %s, value: %i\n",
-        (newState.status.hasBrightness ? "true" : "false"),
-        newState.brightness
+        (state.status.hasBrightness ? "true" : "false"),
+        state.brightness
     );
     Serial.printf(
         "  - has color_temp: %s, value: %i\n",
-        (newState.status.hasColorTemp ? "true" : "false"),
-        newState.color_temp
+        (state.status.hasColorTemp ? "true" : "false"),
+        state.color_temp
     );
     Serial.printf(
         "  - has transition: %s, value: %i\n",
-        (newState.status.hasTransition ? "true" : "false"),
-        newState.transition
+        (state.status.hasTransition ? "true" : "false"),
+        state.transition
     );
     Serial.printf(
         "  - has effect: %s, value: '%s'\n",
-        (newState.status.hasEffect ? "true" : "false"),
-        newState.effect
+        (state.status.hasEffect ? "true" : "false"),
+        state.effect
     );
     Serial.printf("  - has color: %s, value: [%i,%i,%i,%0.2f,%0.2f]\n",
-        (newState.status.hasColor ? "true" : "false"),
-        newState.color.r, newState.color.g, newState.color.b,
-        newState.color.h, newState.color.s
+        (state.status.hasColor ? "true" : "false"),
+        state.color.r, state.color.g, state.color.b,
+        state.color.h, state.color.s
     );
     #endif
-
-    return newState;
 }
 
 /**
