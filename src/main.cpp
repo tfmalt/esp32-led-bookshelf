@@ -22,15 +22,17 @@
 #include <WiFiClientSecure.h>
 #include <PubSubClient.h>
 #include <LedShelf.h>
+#include <LightStateController.h>
 
 // TLS Root Certificate to be read from SPIFFS
 String ca_root;
 
 // global objects
-Config           config;
-LightState       LightStateController;
-WiFiClientSecure wifiClient;
-PubSubClient     mqttClient;
+Config                config;
+LightStateController  lightState;
+LightState            currentState;
+WiFiClientSecure      wifiClient;
+PubSubClient          mqttClient;
 
 uint8_t counter = 0;
 
@@ -51,7 +53,7 @@ uint8_t brightness = 255;
 void readConfig()
 {
     const char* path = "/config.json";
-    String data;
+    // String data;
 
     Serial.printf("Reading config file: %s\r\n", path);
 
@@ -88,23 +90,22 @@ void readConfig()
  */
 void readCA()
 {
-  const char* path = "/ca.pem";
-
-  Serial.printf("Reading CA file: %s\n", path);
-
-  File file = SPIFFS.open(path, "r");
-
-  if (!file) {
-    Serial.printf("  - Failed to open %s for reading\n", path);
-    return;
-  }
-
-  ca_root = "";
-  while (file.available()) {
-    ca_root += file.readString();
-  }
-
-  file.close();
+    const char* path = "/ca.pem";
+    Serial.printf("Reading CA file: %s\n", path);
+  
+    File file = SPIFFS.open(path, "r");
+  
+    if (!file) {
+        Serial.printf("  - Failed to open %s for reading\n", path);
+        return;
+    }
+  
+    ca_root = "";
+    while (file.available()) {
+        ca_root += file.readString();
+    }
+  
+    file.close();
 }
 
 
@@ -113,52 +114,51 @@ void readCA()
  */
 void setupWifi()
 {
-  digitalWrite(BUILTIN_LED, LOW);
-
-  delay(10);
-
-  Serial.printf("Connecting to: %s ", config.ssid.c_str());
-
-  WiFi.begin(config.ssid.c_str(), config.psk.c_str());
-
-  while (WiFi.status() != WL_CONNECTED) {
-    digitalWrite(BUILTIN_LED, HIGH);
-    Serial.print(".");
-    delay(500);
     digitalWrite(BUILTIN_LED, LOW);
-  }
-
-  Serial.println(" WiFi connected");
-  Serial.print("  - IP address: ");
-  Serial.println(WiFi.localIP());
-  Serial.print("  - DNS: ");
-  Serial.println(WiFi.dnsIP());
+  
+    delay(10);
+  
+    Serial.printf("Connecting to: %s ", config.ssid.c_str());
+  
+    WiFi.begin(config.ssid.c_str(), config.psk.c_str());
+  
+    while (WiFi.status() != WL_CONNECTED) {
+        digitalWrite(BUILTIN_LED, HIGH);
+        Serial.print(".");
+        delay(500);
+        digitalWrite(BUILTIN_LED, LOW);
+    }
+  
+    Serial.println(" WiFi connected");
+    Serial.print("  - IP address: ");
+    Serial.println(WiFi.localIP());
+    Serial.print("  - DNS: ");
+    Serial.println(WiFi.dnsIP());
 }
 
 void setLedToRGB(uint8_t r, uint8_t g, uint8_t b) {
-  Serial.printf("DEBUG: Setting led to color: [%i, %i, %i]\n", r, g, b);
-  ledcWrite(LEDC_RED, r);
-  ledcWrite(LEDC_GREEN, g);
-  ledcWrite(LEDC_BLUE, b);
+    Serial.printf("DEBUG: Setting led to color: [%i, %i, %i]\n", r, g, b);
+    ledcWrite(LEDC_RED, r);
+    ledcWrite(LEDC_GREEN, g);
+    ledcWrite(LEDC_BLUE, b);
 }
 
 String mqttPaylodToString(byte* p_payload, unsigned int p_length)
 {
-  String message;
-
-  for (uint8_t i = 0; i < p_length; i++) {
-    message.concat( (char) p_payload[i] );
-  }
-
-  return message;
+    String message;
+  
+    for (uint8_t i = 0; i < p_length; i++) {
+        message.concat( (char) p_payload[i] );
+    }
+  
+    return message;
 }
 
 void mqttCallback (char* p_topic, byte* p_message, unsigned int p_length)
 {
     digitalWrite(BUILTIN_LED, HIGH);
 
-
-    Serial.printf("INFO: New MQTT message: '%s' refactor\n", p_topic);
+    Serial.printf("INFO: New MQTT message: '%s'\n", p_topic);
 
     if (!String(config.command_topic).equals(p_topic)) {
         Serial.printf("  - ERROR: Not a valid topic: '%s'. IGNORING\n", p_topic);
@@ -166,13 +166,14 @@ void mqttCallback (char* p_topic, byte* p_message, unsigned int p_length)
         return;
     }
 
-    LightState newState = getLightStateFromMQTT(p_message); // Creating empty struct for state
+    uint8_t result = lightState.newState(p_message);
+    // LightState newState = getLightStateFromMQTT(p_message); // Creating empty struct for state
 
-    Serial.printf("DEBUG: this is effect: '%s' %i\n", newState.effect, strlen(newState.effect));
+    // Serial.printf("DEBUG: this is effect: '%s' %i\n", newState.effect, strlen(newState.effect));
 
-    if (strlen(newState.effect) == 0) {
-        setLedToRGB(newState.color.r, newState.color.g, newState.color.b);
-    }
+    // if (strlen(newState.effect) == 0) {
+    //     setLedToRGB(newState.color.r, newState.color.g, newState.color.b);
+    // }
 
     String newStateJson = createJsonString(newState);
 
@@ -325,6 +326,7 @@ void setup()
 
   Serial.begin(115200);
   Serial.printf("Starting...\n");
+  lightState.setCurrentState("hello");
 
   pinMode(BUILTIN_LED, OUTPUT);
   digitalWrite(BUILTIN_LED, LOW);
