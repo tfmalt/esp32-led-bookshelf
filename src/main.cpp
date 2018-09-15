@@ -166,35 +166,10 @@ void mqttCallback (char* p_topic, byte* p_message, unsigned int p_length)
     }
 
     LightState newState = lightState.newState(p_message);
-    // LightState newState = getLightStateFromMQTT(p_message); // Creating empty struct for state
+    if (newState.status.hasColor) {
+        setLedToRGB(newState.color.r, newState.color.g, newState.color.b);
+    }
 
-    Serial.printf(
-        "DEBUG: this is effect: '%s' %i\n",
-        newState.effect, strlen(newState.effect)
-    );
-
-    // if (strlen(newState.effect) == 0) {
-    //     setLedToRGB(newState.color.r, newState.color.g, newState.color.b);
-    // }
-
-    // String newStateJson = createJsonString(newState);
-
-    // debug code
-    // Serial.println("DEBUG: Done JSON:");
-    // Serial.println(newStateJson);
-
-    // int length = strlen(newStateJson.c_str());
-    // int t_length = strlen(config.state_topic.c_str());
-    // int total = 5 + 2 + t_length + length;
-
-    // Serial.printf("payload length: %i\n", length);
-    // Serial.printf("packet length: %i\n", total);
-    // Serial.printf("transfer size: %i\n", MQTT_MAX_TRANSFER_SIZE);
-    // Serial.printf("packet size: %i\n", MQTT_MAX_PACKET_SIZE);
-
-
-    // TOOD: currentState.effect = state.effect;
-    // TODO: fix proper store and publish of state
     // if (MQTT_MAX_PACKET_SIZE < 5 + 2+strlen(topic) + plength) {
     // mqttClient.publish(config.state_topic.c_str(), newStateJson.c_str(), true);
     // mqttClient.publish(config.state_topic.c_str(), "{\"state\": \"ON\", \"testing\": \"Yes\"}", true);
@@ -374,11 +349,13 @@ void loop() {
         connectMQTT();
     }
 
-    LightState currentState = lightState.getCurrentState();
     mqttClient.loop();
+
+    LightState currentState = lightState.getCurrentState();
 
     if (strcmp(currentState.effect, "colorloop") == 0) {
         runEffectColorloop();
     }
+
     delay(33);
 }
