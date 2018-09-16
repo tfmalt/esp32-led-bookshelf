@@ -11,8 +11,8 @@
  *
  * Copyright (c) 2018 Thomas Malt
  */
-#define MQTT_MAX_PACKET_SIZE 256
-#define MQTT_MAX_TRANSFER_SIZE 256
+// define MQTT_MAX_PACKET_SIZE 256
+// define MQTT_MAX_TRANSFER_SIZE 256
 
 #include <debug.h>
 #include <Arduino.h>
@@ -169,6 +169,8 @@ void mqttCallback (char* p_topic, byte* p_message, unsigned int p_length)
     if (newState.status.hasColor) {
         setLedToRGB(newState.color.r, newState.color.g, newState.color.b);
     }
+
+    const char* stateJson = lightState.getStateJson();
 
     // if (MQTT_MAX_PACKET_SIZE < 5 + 2+strlen(topic) + plength) {
     // mqttClient.publish(config.state_topic.c_str(), newStateJson.c_str(), true);
