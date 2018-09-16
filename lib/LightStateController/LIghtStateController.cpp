@@ -49,15 +49,26 @@ uint8_t LightStateController::initialize() {
 }
 
 LightState LightStateController::newState(byte* payload) {
-    LightState newState = getLightStateFromPayload(payload);
+    try {
+        LightState newState = getLightStateFromPayload(payload);
+        #ifdef DEBUG
+        printStateDebug(newState);
+        #endif
 
-    #ifdef DEBUG
-    printStateDebug(newState);
-    #endif
+        currentState = newState;
+        return currentState;
+    }
+    catch (LightState errState) {
+        String error = "Unknown";
+        if (errState.status.status == LIGHT_MQTT_JSON_FAILED) {
+            error = "Parsing of json failed.";
+        }
+        else if (errState.status.status == LIGHT_MQTT_JSON_NO_STATE) {
+            error = "Did not get correct state parameter in Json.";
+        }
 
-
-    currentState = newState;
-    return newState;
+        Serial.printf("ERROR: parsing of new state threw error: %s\n", error);
+    }
 }
 
 void LightStateController::printStateDebug(LightState& state) {
@@ -127,7 +138,7 @@ LightState LightStateController::getLightStateFromPayload(byte* payload) {
     if (!root.success()) {
         newState.status.status = LIGHT_MQTT_JSON_FAILED;
         newState.status.success = false;
-        return newState;
+        throw newState;
     }
 
     char output[256] = "";
@@ -140,7 +151,7 @@ LightState LightStateController::getLightStateFromPayload(byte* payload) {
     if (!root.containsKey("state")) {
         newState.status.status = LIGHT_MQTT_JSON_NO_STATE;
         newState.status.success = false;
-        return newState;
+        throw newState;
     }
 
     newState.state = root["state"] == "ON" ? true : false;
@@ -180,6 +191,30 @@ LightState LightStateController::getLightStateFromPayload(byte* payload) {
 
     newState.status.success = true;
     return newState;
+}
+
+const char* LightStateController::getStateJson() {
+    StaticJsonBuffer<256> jsonBuffer;
+    JsonObject& object = jsonBuffer.createObject();
+    JsonObject& color = jsonBuffer.createObject();
+    LightState state = getCurrentState();
+
+    color["r"] = state.color.r;
+    color["g"] = state.color.g;
+    color["b"] = state.color.b;
+    color["h"] = state.color.h;
+    color["s"] = state.color.s;
+
+    object["state"]       = (state.state) ? "ON" : "OFF";
+    object["brightness"]  = state.brightness;
+    object["color"]       = color;
+    object["effect"]      = state.effect;
+    object["color_temp"]  = state.color_temp;
+
+    String output = "";
+    object.printTo(output);
+    return output;
+
 }
 
 LightState LightStateController::getCurrentState() {

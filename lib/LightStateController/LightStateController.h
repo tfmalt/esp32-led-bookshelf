@@ -56,10 +56,11 @@ class LightStateController {
         void        printStateDebug(LightState& state);
     public:
         LightStateController();
-        uint8_t    initialize();
-        bool       setCurrentState(const char* stateString);
-        LightState newState(byte* payload);
-        LightState getCurrentState();
+        uint8_t     initialize();
+        bool        setCurrentState(const char* stateString);
+        LightState  newState(byte* payload);
+        LightState  getCurrentState();
+        const char* getStateJson();
 };
 
 #endif // LightStateControlller_h
