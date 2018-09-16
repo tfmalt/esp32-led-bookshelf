@@ -19,7 +19,4 @@ typedef struct Config {
   String status_topic;
 } Config;
 
-
-Color getColorFromJson(JsonObject& root);
-LightState getLightStateFromMQTT(byte * message);
 String createJsonString(LightState& state);
