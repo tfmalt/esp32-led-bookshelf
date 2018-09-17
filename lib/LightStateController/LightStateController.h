@@ -10,6 +10,7 @@
 #define LIGHT_STATEFILE_JSON_FAILED     2
 #define LIGHT_MQTT_JSON_FAILED          3
 #define LIGHT_MQTT_JSON_NO_STATE        4
+#define LIGHT_STATEFILE_WROTE_SUCCESS   5
 
 typedef struct Color {
     uint8_t r;
@@ -54,13 +55,16 @@ class LightStateController {
         Color       getColorFromJsonObject(JsonObject& root);
         LightState  getLightStateFromPayload(byte* payload);
         void        printStateDebug(LightState& state);
+        JsonObject& createCurrentStateJsonObject(JsonObject& object, JsonObject& color);
+        uint8_t     saveCurrentState();
+
     public:
         LightStateController();
         uint8_t     initialize();
         bool        setCurrentState(const char* stateString);
         LightState  newState(byte* payload);
         LightState  getCurrentState();
-        const char* getStateJson();
+        void printStateJsonTo(char* output);
 };
 
 #endif // LightStateControlller_h

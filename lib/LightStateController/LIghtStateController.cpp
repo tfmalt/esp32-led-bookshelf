@@ -36,15 +36,19 @@ uint8_t LightStateController::initialize() {
 
     if (!root.success()) return LIGHT_STATEFILE_JSON_FAILED;
 
-    file.close();
-
-    currentState.state = root["state"] || false; //  == "ON") ? true : false;
+    currentState.state = (root["state"] == "ON") ? true : false;
 
     // if (root.containsKey("effect"))
     currentState.effect     = (const char*) root["effect"];
-    currentState.brightness = root["brightness"] || 255;
-    currentState.color_temp = root["color_temp"] || 200;
+    currentState.brightness = (uint8_t) root["brightness"];
+    currentState.color_temp = (uint16_t) root["color_temp"];
+    currentState.color.r    = (uint8_t) root["color"]["r"];
+    currentState.color.g    = (uint8_t) root["color"]["g"];
+    currentState.color.b    = (uint8_t) root["color"]["b"];
+    currentState.color.h    = (float) root["color"]["h"];
+    currentState.color.s    = (float) root["color"]["s"];
 
+    file.close();
     return 0;
 }
 
@@ -56,7 +60,8 @@ LightState LightStateController::newState(byte* payload) {
         #endif
 
         currentState = newState;
-        return currentState;
+
+        saveCurrentState();
     }
     catch (LightState errState) {
         String error = "Unknown";
@@ -67,8 +72,9 @@ LightState LightStateController::newState(byte* payload) {
             error = "Did not get correct state parameter in Json.";
         }
 
-        Serial.printf("ERROR: parsing of new state threw error: %s\n", error);
+        Serial.printf("ERROR: parsing of new state threw error: %s\n", error.c_str());
     }
+    return currentState;
 }
 
 void LightStateController::printStateDebug(LightState& state) {
@@ -193,10 +199,16 @@ LightState LightStateController::getLightStateFromPayload(byte* payload) {
     return newState;
 }
 
-const char* LightStateController::getStateJson() {
+void LightStateController::printStateJsonTo(char* output) {
     StaticJsonBuffer<256> jsonBuffer;
-    JsonObject& object = jsonBuffer.createObject();
-    JsonObject& color = jsonBuffer.createObject();
+    JsonObject& object  = jsonBuffer.createObject();
+    JsonObject& color   = jsonBuffer.createObject();
+    JsonObject& current = createCurrentStateJsonObject(object, color);
+
+    current.printTo(output, 256);
+}
+
+JsonObject& LightStateController::createCurrentStateJsonObject(JsonObject& object, JsonObject& color) {
     LightState state = getCurrentState();
 
     color["r"] = state.color.r;
@@ -207,15 +219,30 @@ const char* LightStateController::getStateJson() {
 
     object["state"]       = (state.state) ? "ON" : "OFF";
     object["brightness"]  = state.brightness;
+    object["color_temp"]  = state.color_temp;
     object["color"]       = color;
     object["effect"]      = state.effect;
-    object["color_temp"]  = state.color_temp;
 
-    String output = "";
-    object.printTo(output);
-    return output;
-
+    return object;
 }
+
+uint8_t LightStateController::saveCurrentState() {
+    StaticJsonBuffer<256> jsonBuffer;
+    JsonObject& object = jsonBuffer.createObject();
+    JsonObject& color = jsonBuffer.createObject();
+    JsonObject& current = createCurrentStateJsonObject(object, color);
+
+    File file = SPIFFS.open(stateFile, "w+");
+    current.prettyPrintTo(file);
+
+    Serial.printf("DEBUG: writing to: %s\n", stateFile);
+    current.prettyPrintTo(Serial);
+    Serial.println();
+
+    file.close();
+    return LIGHT_STATEFILE_WROTE_SUCCESS;
+}
+
 
 LightState LightStateController::getCurrentState() {
     return currentState;

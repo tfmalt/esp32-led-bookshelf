@@ -170,10 +170,13 @@ void mqttCallback (char* p_topic, byte* p_message, unsigned int p_length)
         setLedToRGB(newState.color.r, newState.color.g, newState.color.b);
     }
 
-    const char* stateJson = lightState.getStateJson();
+    char json[256];
+    lightState.printStateJsonTo(json);
+
+    Serial.printf("DEBUG: got json: '%s'\n", json);
 
     // if (MQTT_MAX_PACKET_SIZE < 5 + 2+strlen(topic) + plength) {
-    // mqttClient.publish(config.state_topic.c_str(), newStateJson.c_str(), true);
+    mqttClient.publish(config.state_topic.c_str(), json, true);
     // mqttClient.publish(config.state_topic.c_str(), "{\"state\": \"ON\", \"testing\": \"Yes\"}", true);
     digitalWrite(BUILTIN_LED, LOW);
 }
@@ -317,18 +320,22 @@ void setup()
 
     uint8_t result = lightState.initialize();
     LightState currentState  = lightState.getCurrentState();
-    #ifdef DEBUG
     String resultString = "";
 
-    if (result == LIGHT_STATEFILE_PARSED_SUCCESS) resultString = "success";
     if (result == LIGHT_STATEFILE_NOT_FOUND)      resultString = "file not found";
     if (result == LIGHT_STATEFILE_JSON_FAILED)    resultString = "json failed";
+    if (result == LIGHT_STATEFILE_PARSED_SUCCESS) resultString = "success";
 
     Serial.printf("  - state initialize: %s\n", resultString.c_str());
-    Serial.printf("  - current brightness: %i\n", currentState.brightness);
+    #ifdef DEBUG
+    Serial.printf("  - DEBUG: current brightness: %i\n", currentState.brightness);
+    Serial.printf("  - DEBUG: current color_temp: %i\n", currentState.color_temp);
+    Serial.printf("  - DEBUG: current color: [%i, %i, %i, %0.2f, %0.2f]\n",
+        currentState.color.r, currentState.color.g, currentState.color.b,
+        currentState.color.h, currentState.color.s
+    );
+    Serial.printf("  - DEBUG: effect is set to '%s'\n", currentState.effect);
     #endif
-
-    Serial.printf("  - INFO: effect is set to '%s'\n", currentState.effect);
 
     readConfig();
     readCA();
