@@ -24,34 +24,31 @@
 #include <LedShelf.h>
 #include <LightStateController.h>
 
-// TLS Root Certificate to be read from SPIFFS
-String ca_root;
+// led GPIOs
+static const uint8_t GPIO_RED   = 25;
+static const uint8_t GPIO_GREEN = 26;
+static const uint8_t GPIO_BLUE  = 27;
+
+// define pwm output channels
+static const uint8_t LEDC_RED   = 1;
+static const uint8_t LEDC_GREEN = 2;
+static const uint8_t LEDC_BLUE  = 3;
 
 // global objects
+String                ca_root;
 Config                config;
 LightStateController  lightState;
 WiFiClientSecure      wifiClient;
 PubSubClient          mqttClient;
 
 uint8_t counter = 0;
-
-// led GPIOs
-#define GPIO_RED   25
-#define GPIO_GREEN 26
-#define GPIO_BLUE  27
-
-#define LEDC_RED    1
-#define LEDC_GREEN  2
-#define LEDC_BLUE   3
-
-
-uint8_t color = 0;          // a value from 0 to 255 representing the hue
+uint8_t color   = 0;          // a value from 0 to 255 representing the hue
 uint32_t R, G, B;           // the Red Green and Blue color components
 uint8_t brightness = 255;
 
 void readConfig()
 {
-    const char* path = "/config.json";
+    static const char* path = "/config.json";
     // String data;
 
     Serial.printf("Reading config file: %s\r\n", path);
@@ -89,7 +86,7 @@ void readConfig()
  */
 void readCA()
 {
-    const char* path = "/ca.pem";
+    static const char* path = "/ca.pem";
     Serial.printf("Reading CA file: %s\n", path);
 
     File file = SPIFFS.open(path, "r");
@@ -153,6 +150,13 @@ String mqttPaylodToString(byte* p_payload, unsigned int p_length)
     return message;
 }
 
+void mqttPublishState()
+{
+    char json[256];
+    lightState.printStateJsonTo(json);
+    mqttClient.publish(config.state_topic.c_str(), json, true);
+}
+
 void mqttCallback (char* p_topic, byte* p_message, unsigned int p_length)
 {
     digitalWrite(BUILTIN_LED, HIGH);
@@ -166,18 +170,17 @@ void mqttCallback (char* p_topic, byte* p_message, unsigned int p_length)
     }
 
     LightState newState = lightState.newState(p_message);
-    if (newState.status.hasColor) {
-        setLedToRGB(newState.color.r, newState.color.g, newState.color.b);
+    // Handles the light setting logic. Should be moved to own function / object
+    if (newState.state == true) {
+        if (newState.status.hasEffect == false) {
+            setLedToRGB(newState.color.r, newState.color.g, newState.color.b);
+        }
+    }
+    else {
+        setLedToRGB(0, 0, 0);
     }
 
-    char json[256];
-    lightState.printStateJsonTo(json);
-
-    Serial.printf("DEBUG: got json: '%s'\n", json);
-
-    // if (MQTT_MAX_PACKET_SIZE < 5 + 2+strlen(topic) + plength) {
-    mqttClient.publish(config.state_topic.c_str(), json, true);
-    // mqttClient.publish(config.state_topic.c_str(), "{\"state\": \"ON\", \"testing\": \"Yes\"}", true);
+    mqttPublishState();
     digitalWrite(BUILTIN_LED, LOW);
 }
 
@@ -194,42 +197,43 @@ void setupMQTT()
 
 void connectMQTT()
 {
-  digitalWrite(BUILTIN_LED, HIGH);
-  IPAddress mqttip;
-  WiFi.hostByName(config.server.c_str(), mqttip);
+    digitalWrite(BUILTIN_LED, HIGH);
+    IPAddress mqttip;
+    WiFi.hostByName(config.server.c_str(), mqttip);
 
-  Serial.printf("  - %s = ", config.server.c_str());
-  Serial.println(mqttip);
+    Serial.printf("  - %s = ", config.server.c_str());
+    Serial.println(mqttip);
 
-  while (!mqttClient.connected()) {
-    Serial.printf(
-      "Attempting MQTT connection to \"%s\" \"%i\" as \"%s\" ... ",
-      config.server.c_str(), config.port, config.username.c_str()
-    );
+    while (!mqttClient.connected()) {
+        Serial.printf(
+            "Attempting MQTT connection to \"%s\" \"%i\" as \"%s\" ... ",
+            config.server.c_str(), config.port, config.username.c_str()
+        );
 
-    if (mqttClient.connect(
-      config.client.c_str(),
-      config.username.c_str(),
-      config.password.c_str(),
-      config.status_topic.c_str(),
-      0, true, "Disconnected")
-    ) {
-      Serial.println(" connected");
-      Serial.print("  - status: ");
-      Serial.println(config.status_topic);
-      Serial.print("  - command: ");
-      Serial.println(config.command_topic);
-      mqttClient.publish(config.status_topic.c_str(), "Online", true);
-      mqttClient.subscribe(config.command_topic.c_str());
+        if (mqttClient.connect(
+            config.client.c_str(),
+            config.username.c_str(),
+            config.password.c_str(),
+            config.status_topic.c_str(),
+            0, true, "Disconnected")
+        ) {
+            Serial.println(" connected");
+            Serial.print("  - status: ");
+            Serial.println(config.status_topic);
+            Serial.print("  - command: ");
+            Serial.println(config.command_topic);
+            mqttClient.publish(config.status_topic.c_str(), "Online", true);
+            mqttClient.subscribe(config.command_topic.c_str());
+        }
+        else {
+            Serial.print(" failed: ");
+            Serial.println(mqttClient.state());
+            delay(5000);
+        }
     }
-    else {
-      Serial.print(" failed: ");
-      Serial.println(mqttClient.state());
-      delay(5000);
-    }
-  }
 
-  digitalWrite(BUILTIN_LED, LOW);
+    mqttPublishState();
+    digitalWrite(BUILTIN_LED, LOW);
 }
 
 
@@ -334,7 +338,7 @@ void setup()
         currentState.color.r, currentState.color.g, currentState.color.b,
         currentState.color.h, currentState.color.s
     );
-    Serial.printf("  - DEBUG: effect is set to '%s'\n", currentState.effect);
+    Serial.printf("  - DEBUG: effect is set to '%s'\n", currentState.effect.c_str());
     #endif
 
     readConfig();
@@ -342,6 +346,13 @@ void setup()
     setupWifi();
     setupMQTT();
     setupLeds();
+
+    // set initial state of led after setup.
+    if (currentState.state == true) {
+        setLedToRGB(currentState.color.r, currentState.color.g, currentState.color.b);
+    } else {
+        setLedToRGB(0, 0, 0);
+    }
 }
 
 void loop() {
@@ -362,7 +373,7 @@ void loop() {
 
     LightState currentState = lightState.getCurrentState();
 
-    if (strcmp(currentState.effect, "colorloop") == 0) {
+    if (currentState.effect == "colorloop") {
         runEffectColorloop();
     }
 
