@@ -51,7 +51,7 @@ void readConfig()
     static const char* path = "/config.json";
     // String data;
 
-    Serial.printf("Reading config file: %s\r\n", path);
+    Serial.printf("Reading config file: %s\n", path);
 
     File file = SPIFFS.open(path, "r");
     if(!file) {
