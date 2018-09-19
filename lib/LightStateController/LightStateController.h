@@ -40,7 +40,7 @@ typedef struct LightState {
     uint16_t color_temp;
     uint16_t transition;
     Color color;
-    const char* effect;
+    String effect;
     bool state;
     LightStatus status;
 } LightState;
@@ -49,8 +49,9 @@ class LightStateController {
     private:
         LightState  currentState = {0};
         LightState  defaultState = {0};
+        ulong       timestamp    = 0;
 
-        const char* stateFile = "/lightState.json";
+        const char* stateFile = "/light_state.json";
 
         Color       getColorFromJsonObject(JsonObject& root);
         LightState  getLightStateFromPayload(byte* payload);
@@ -60,11 +61,11 @@ class LightStateController {
 
     public:
         LightStateController();
-        uint8_t     initialize();
-        bool        setCurrentState(const char* stateString);
-        LightState  newState(byte* payload);
-        LightState  getCurrentState();
-        void printStateJsonTo(char* output);
+        uint8_t                 initialize();
+        LightStateController&   setCurrentState(const char* stateString);
+        LightState              newState(byte* payload);
+        LightState              getCurrentState();
+        void                    printStateJsonTo(char* output);
 };
 
 #endif // LightStateControlller_h

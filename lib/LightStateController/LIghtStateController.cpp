@@ -18,20 +18,22 @@ LightStateController::LightStateController() {
     defaultState.status     = defaultStatus;
 }
 
-bool LightStateController::setCurrentState(const char* stateString) {
+LightStateController& LightStateController::setCurrentState(const char* stateString) {
     Serial.println("DEBUG: LightStateController up and running.");
     Serial.printf("  - %s\n", stateFile);
     Serial.printf("  - %i\n", currentState.color_temp);
-    return true;
+    return *this;
 }
 
 uint8_t LightStateController::initialize() {
     currentState = defaultState;
-
+    Serial.printf("DEBUG: Reading in '%s'\n", stateFile);
     File file = SPIFFS.open(stateFile, "r");
     if (!file) return LIGHT_STATEFILE_NOT_FOUND;
 
-    StaticJsonBuffer<256> buffer;
+    Serial.println("  - Opened file ok.");
+
+    StaticJsonBuffer<512> buffer;
     JsonObject& root = buffer.parseObject(file);
 
     if (!root.success()) return LIGHT_STATEFILE_JSON_FAILED;
@@ -39,7 +41,7 @@ uint8_t LightStateController::initialize() {
     currentState.state = (root["state"] == "ON") ? true : false;
 
     // if (root.containsKey("effect"))
-    currentState.effect     = (const char*) root["effect"];
+    currentState.effect     = root["effect"].as<String>();
     currentState.brightness = (uint8_t) root["brightness"];
     currentState.color_temp = (uint16_t) root["color_temp"];
     currentState.color.r    = (uint8_t) root["color"]["r"];
@@ -49,6 +51,7 @@ uint8_t LightStateController::initialize() {
     currentState.color.s    = (float) root["color"]["s"];
 
     file.close();
+    timestamp = millis();
     return 0;
 }
 
@@ -58,10 +61,7 @@ LightState LightStateController::newState(byte* payload) {
         #ifdef DEBUG
         printStateDebug(newState);
         #endif
-
         currentState = newState;
-
-        saveCurrentState();
     }
     catch (LightState errState) {
         String error = "Unknown";
@@ -73,6 +73,17 @@ LightState LightStateController::newState(byte* payload) {
         }
 
         Serial.printf("ERROR: parsing of new state threw error: %s\n", error.c_str());
+    }
+
+    unsigned long duration = millis();
+    if (duration < timestamp) timestamp = 0;
+    unsigned long diff = duration - timestamp;
+
+    Serial.printf("DEBUG: time since last command: %lu ms\n", diff);
+    if (diff > 300000) {
+        Serial.println("  - diff is more than 5 minutes. Saving state");
+        timestamp = duration;
+        saveCurrentState();
     }
     return currentState;
 }
@@ -103,7 +114,7 @@ void LightStateController::printStateDebug(LightState& state) {
     Serial.printf(
         "  - has effect: %s, value: '%s'\n",
         (state.status.hasEffect ? "true" : "false"),
-        state.effect
+        state.effect.c_str()
     );
     Serial.printf("  - has color: %s, value: [%i,%i,%i,%0.2f,%0.2f]\n",
         (state.status.hasColor ? "true" : "false"),
@@ -185,7 +196,7 @@ LightState LightStateController::getLightStateFromPayload(byte* payload) {
 
     if (root.containsKey("effect")) {
         newState.status.hasEffect = true;
-        newState.effect = root["effect"];
+        newState.effect = root["effect"].as<String>();
     } else {
         newState.effect = "";
     }
@@ -235,9 +246,9 @@ uint8_t LightStateController::saveCurrentState() {
     File file = SPIFFS.open(stateFile, "w+");
     current.prettyPrintTo(file);
 
-    Serial.printf("DEBUG: writing to: %s\n", stateFile);
-    current.prettyPrintTo(Serial);
-    Serial.println();
+    // Serial.printf("DEBUG: writing to: %s\n", stateFile);
+    // current.prettyPrintTo(Serial);
+    // Serial.println();
 
     file.close();
     return LIGHT_STATEFILE_WROTE_SUCCESS;
