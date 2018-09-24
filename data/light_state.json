@@ -2,6 +2,7 @@
   "state": "ON",
   "brightness": 89,
   "color_temp": 0,
+  "transition": 1,
   "color": {
     "r": 255,
     "g": 0,
