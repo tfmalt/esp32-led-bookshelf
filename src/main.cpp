@@ -11,8 +11,7 @@
  *
  * Copyright (c) 2018 Thomas Malt
  */
-// define MQTT_MAX_PACKET_SIZE 256
-// define MQTT_MAX_TRANSFER_SIZE 256
+#define FASTLED_ALLOW_INTERRUPTS 0
 
 #include <debug.h>
 #include <Arduino.h>
@@ -21,30 +20,178 @@
 #include <ArduinoJson.h>
 #include <WiFiClientSecure.h>
 #include <PubSubClient.h>
+#include <FastLED.h>
 #include <LedShelf.h>
 #include <LightStateController.h>
 
-// led GPIOs
-static const uint8_t GPIO_RED   = 25;
-static const uint8_t GPIO_GREEN = 26;
-static const uint8_t GPIO_BLUE  = 27;
+FASTLED_USING_NAMESPACE
 
-// define pwm output channels
-static const uint8_t LEDC_RED   = 1;
-static const uint8_t LEDC_GREEN = 2;
-static const uint8_t LEDC_BLUE  = 3;
+// Fastled definitions
+static const uint8_t GPIO_DATA         = 15;
+static const uint8_t NUM_LEDS          = 31;
+static const uint8_t FPS               = 60;
+static const uint8_t FASTLED_SHOW_CORE = 0;
+
+// Using esp32 other core to run FastLED.show().
+// -- Task handles for use in the notifications
+static TaskHandle_t FastLEDshowTaskHandle   = 0;
+static TaskHandle_t userTaskHandle          = 0;
+
+// A command to hold the command we're currently executing.
 
 // global objects
-String                ca_root;
-Config                config;
-LightStateController  lightState;
+String                ca_root;        // CA Root certificate for TLS
+Config                config;         // Struct parsed from json config file.
+LightStateController  lightState;     // Own object. Responsible for state.
 WiFiClientSecure      wifiClient;
 PubSubClient          mqttClient;
+CRGB                  leds[NUM_LEDS];
 
-uint8_t counter = 0;
-uint8_t color   = 0;          // a value from 0 to 255 representing the hue
-uint32_t R, G, B;           // the Red Green and Blue color components
-uint8_t brightness = 255;
+uint8_t  gHue = 0; // rotating "base color" used by many of the patterns
+uint16_t commandFrames     = FPS;
+uint16_t commandFrameCount = 0;
+ulong    commandStart      = 0;
+
+// A typedef to hold a pointer to the current command to execute.
+typedef void (*LightCommand)();
+
+void cmdEmpty()
+{
+}
+
+LightCommand currentCommand = cmdEmpty;
+LightCommand currentEffect  = cmdEmpty;
+
+void cmdSetBrightness()
+{
+    LightState state = lightState.getCurrentState();
+
+    uint16_t duration = state.transition || 1;
+    uint8_t  target   = state.brightness;
+    uint8_t  current  = FastLED.getBrightness();
+
+    if (commandFrameCount < commandFrames) {
+        FastLED.setBrightness(current + ((target - current) / (commandFrames - commandFrameCount)));
+        commandFrameCount++;
+    } else {
+        commandFrameCount = 0;
+        commandFrames     = FPS;
+        currentCommand    = cmdEmpty;
+
+        Serial.printf(
+            "  - command: setting brightness DONE [%i] %lu ms.\n",
+            FastLED.getBrightness(), (millis() - commandStart)
+        );
+    }
+}
+
+/**
+ * Helper function that blends one uint8_t toward another by a given amount
+ * Taken from: https://gist.github.com/kriegsman/d0a5ed3c8f38c64adcb4837dafb6e690
+ */
+void nblendU8TowardU8( uint8_t& cur, const uint8_t target, uint8_t amount)
+{
+    if( cur == target) return;
+
+    if( cur < target ) {
+        uint8_t delta = target - cur;
+        delta = scale8_video( delta, amount);
+        cur += delta;
+    } else {
+        uint8_t delta = cur - target;
+        delta = scale8_video( delta, amount);
+        cur -= delta;
+    }
+}
+
+/**
+ * Blend one CRGB color toward another CRGB color by a given amount.
+ * Blending is linear, and done in the RGB color space.
+ * This function modifies 'cur' in place.
+ * Taken from: https://gist.github.com/kriegsman/d0a5ed3c8f38c64adcb4837dafb6e690
+ */
+CRGB fadeTowardColor( CRGB& cur, const CRGB& target, uint8_t amount)
+{
+    nblendU8TowardU8( cur.red,   target.red,   amount);
+    nblendU8TowardU8( cur.green, target.green, amount);
+    nblendU8TowardU8( cur.blue,  target.blue,  amount);
+    return cur;
+}
+
+/**
+ * Fade an entire array of CRGBs toward a given background color by a given amount
+ * This function modifies the pixel array in place.
+ * Taken from: https://gist.github.com/kriegsman/d0a5ed3c8f38c64adcb4837dafb6e690
+ */
+void fadeTowardColor( CRGB* L, uint16_t N, const CRGB& bgColor, uint8_t fadeAmount)
+{
+    uint16_t check = 0;
+    for( uint16_t i = 0; i < N; i++) {
+        fadeTowardColor( L[i], bgColor, fadeAmount);
+        if (L[i] == bgColor) check++;
+    }
+
+    if (check == NUM_LEDS) {
+        currentCommand = cmdEmpty;
+        Serial.printf("  - fade towards color done in %lu ms.\n", (millis() - commandStart));
+    }
+}
+
+
+void cmdFadeTowardColor()
+{
+    LightState state = lightState.getCurrentState();
+    CRGB targetColor(state.color.r, state.color.g, state.color.b);
+
+    fadeTowardColor(leds, NUM_LEDS, targetColor, 12);
+}
+
+/**
+ * show() for ESP32
+ *
+ * Call this function instead of FastLED.show(). It signals core 0 to issue a show,
+ * then waits for a notification that it is done.
+ *
+ * Borrowed from https://github.com/FastLED/FastLED/blob/master/examples/DemoReelESP32/DemoReelESP32.ino
+ */
+void fastLEDshowESP32()
+{
+    if (userTaskHandle == 0) {
+        // -- Store the handle of the current task, so that the show task can
+        //    notify it when it's done
+        userTaskHandle = xTaskGetCurrentTaskHandle();
+
+        // -- Trigger the show task
+        xTaskNotifyGive(FastLEDshowTaskHandle);
+
+        // -- Wait to be notified that it's done
+        const TickType_t xMaxBlockTime = pdMS_TO_TICKS( 200 );
+        ulTaskNotifyTake(pdTRUE, xMaxBlockTime);
+        userTaskHandle = 0;
+    }
+}
+
+/**
+ * show Task
+ * This function runs on core 0 and just waits for requests to call FastLED.show()
+ *
+ * Borrowed from https://github.com/FastLED/FastLED/blob/master/examples/DemoReelESP32/DemoReelESP32.ino
+ */
+void FastLEDshowTask(void *pvParameters)
+{
+    // -- Run forever...
+    for(;;) {
+        // -- Wait for the trigger
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+
+        // -- Do the show (synchronously)
+        FastLED.show();
+
+        // -- Notify the calling task
+        xTaskNotifyGive(userTaskHandle);
+    }
+}
+
 
 void readConfig()
 {
@@ -132,13 +279,6 @@ void setupWifi()
     Serial.println(WiFi.dnsIP());
 }
 
-void setLedToRGB(uint8_t r, uint8_t g, uint8_t b) {
-    Serial.printf("DEBUG: Setting led to color: [%i, %i, %i]\n", r, g, b);
-    ledcWrite(LEDC_RED, r);
-    ledcWrite(LEDC_GREEN, g);
-    ledcWrite(LEDC_BLUE, b);
-}
-
 String mqttPaylodToString(byte* p_payload, unsigned int p_length)
 {
     String message;
@@ -157,6 +297,11 @@ void mqttPublishState()
     mqttClient.publish(config.state_topic.c_str(), json, true);
 }
 
+/**
+ * Callback when we recive MQTT messages on topics we listen to.
+ *
+ * Parses message, dispatches commands and updates settings.
+ */
 void mqttCallback (char* p_topic, byte* p_message, unsigned int p_length)
 {
     digitalWrite(BUILTIN_LED, HIGH);
@@ -169,20 +314,49 @@ void mqttCallback (char* p_topic, byte* p_message, unsigned int p_length)
         return;
     }
 
-    LightState newState = lightState.newState(p_message);
+    LightState newState = lightState.parseNewState(p_message);
+
     // Handles the light setting logic. Should be moved to own function / object
     if (newState.state == true) {
-        if (newState.status.hasEffect == false) {
-            setLedToRGB(newState.color.r, newState.color.g, newState.color.b);
+        if(newState.status.hasBrightness)
+        {
+            Serial.printf("  - Got new brightness: '%i'\n", newState.brightness);
+            currentCommand = cmdSetBrightness;
+            commandFrames = (FPS * (newState.transition || 1));
+            commandStart = millis();
+        }
+        else if(newState.status.hasColor) {
+            Serial.println("  - Got color");
+            // fill_solid(leds, NUM_LEDS, CRGB(newState.color.r, newState.color.g, newState.color.b));
+            currentCommand = cmdFadeTowardColor;
+            commandStart = millis();
+        }
+        else if (newState.status.hasEffect && newState.effect == "") {
+            Serial.println("  - Got effect none. fading to current color.");
+            currentCommand = cmdFadeTowardColor;
+            commandStart = millis();
+        }
+        // else if (newState.status.hasEffect && newState.effect != "") {
+        //     Serial.printf("  - Got effect '%s'. Setting it.\n", newState.effect);
+        //     currentEffect =
+        // }
+        else {
+            // assuming turn on is the only thing.
+            currentCommand = cmdSetBrightness;
+            commandFrames = (FPS * (newState.transition || 1));
+            commandStart = millis();
         }
     }
     else {
-        setLedToRGB(0, 0, 0);
+        Serial.println("  - Told to turn off");
+        FastLED.setBrightness(0);
     }
 
     mqttPublishState();
     digitalWrite(BUILTIN_LED, LOW);
 }
+// End of MQTT Callback
+// =========================================================================
 
 void setupMQTT()
 {
@@ -236,101 +410,30 @@ void connectMQTT()
     digitalWrite(BUILTIN_LED, LOW);
 }
 
-
-void setupLeds()
-{
-  // Starting led setup
-  // initialize the digital pin as an output.
-  ledcAttachPin(GPIO_RED,   LEDC_RED);
-  ledcAttachPin(GPIO_GREEN, LEDC_GREEN);
-  ledcAttachPin(GPIO_BLUE,  LEDC_BLUE);
-
-  ledcSetup(LEDC_RED,   12000, 8);
-  ledcSetup(LEDC_GREEN, 12000, 8);
-  ledcSetup(LEDC_BLUE,  12000, 8);
-}
-
-// Courtesy http://www.instructables.com/id/How-to-Use-an-RGB-LED/?ALLSTEPS
-// function to convert a color to its Red, Green, and Blue components.
-void hueToRGB(uint8_t hue, uint8_t brightness)
-{
-    uint16_t scaledHue = (hue * 6);
-    uint8_t segment = scaledHue / 256; // segment 0 to 5 on the color wheel
-    uint16_t segmentOffset = scaledHue - (segment * 256); // position within the segment
-
-    uint8_t complement = 0;
-    uint16_t prev = (brightness * ( 255 -  segmentOffset)) / 256;
-    uint16_t next = (brightness *  segmentOffset) / 256;
-
-    switch (segment) {
-    case 0:      // red
-        R = brightness;
-        G = next;
-        B = complement;
-    break;
-    case 1:     // yellow
-        R = prev;
-        G = brightness;
-        B = complement;
-    break;
-    case 2:     // green
-        R = complement;
-        G = brightness;
-        B = next;
-    break;
-    case 3:    // cyan
-        R = complement;
-        G = prev;
-        B = brightness;
-    break;
-    case 4:    // blue
-        R = next;
-        G = complement;
-        B = brightness;
-    break;
-   case 5:      // magenta
-    default:
-        R = brightness;
-        G = complement;
-        B = prev;
-    break;
-    }
-}
-
-void runEffectColorloop() {
-    counter++;
-    if (counter > 255) counter = 0;
-
-    hueToRGB(counter, brightness);
-    ledcWrite(1, R);
-    ledcWrite(2, G);
-    ledcWrite(3, B);
-}
-
 void setup()
 {
     Serial.begin(115200);
     Serial.printf("Starting...\n");
-    //  lightState.setCurrentState("hello");
 
-    pinMode(BUILTIN_LED, OUTPUT);
-    digitalWrite(BUILTIN_LED, LOW);
-    delay(100);
-
-    if (!SPIFFS.begin()) {
-        Serial.println("  - Could not mount SPIFFS.");
+    if (SPIFFS.begin()) {
+        Serial.println("  - Mounting SPIFFS file system.");
+    }
+    else {
+        Serial.println("  - ERROR: Could not mount SPIFFS.");
+        ESP.restart();
         return;
     }
 
-    uint8_t result = lightState.initialize();
+    uint8_t result           = lightState.initialize();
     LightState currentState  = lightState.getCurrentState();
-    String resultString = "";
+    String resultString      = "";
 
     if (result == LIGHT_STATEFILE_NOT_FOUND)      resultString = "file not found";
     if (result == LIGHT_STATEFILE_JSON_FAILED)    resultString = "json failed";
     if (result == LIGHT_STATEFILE_PARSED_SUCCESS) resultString = "success";
 
     Serial.printf("  - state initialize: %s\n", resultString.c_str());
+
     #ifdef DEBUG
     Serial.printf("  - DEBUG: current brightness: %i\n", currentState.brightness);
     Serial.printf("  - DEBUG: current color_temp: %i\n", currentState.color_temp);
@@ -345,14 +448,85 @@ void setup()
     readCA();
     setupWifi();
     setupMQTT();
-    setupLeds();
 
-    // set initial state of led after setup.
-    if (currentState.state == true) {
-        setLedToRGB(currentState.color.r, currentState.color.g, currentState.color.b);
-    } else {
-        setLedToRGB(0, 0, 0);
+    // all examples I've seen has a startup grace delay.
+    // Just cargo-cult copying that practise.
+    delay(3000);
+
+    FastLED.addLeds<WS2812B, GPIO_DATA, GRB>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
+
+    FastLED.setBrightness(currentState.brightness);
+    currentCommand = cmdFadeTowardColor;
+
+    int core = xPortGetCoreID();
+    Serial.print("Main code running on core ");
+    Serial.println(core);
+
+    // -- Create the FastLED show task
+    xTaskCreatePinnedToCore(
+        FastLEDshowTask, "FastLEDshowTask", 2048, NULL, 2,
+        &FastLEDshowTaskHandle, FASTLED_SHOW_CORE
+    );
+}
+
+void rainbow()
+{
+    // FastLED's built-in rainbow generator
+    fill_rainbow( leds, NUM_LEDS, gHue, 7);
+}
+
+void addGlitter( fract8 chanceOfGlitter)
+{
+    if( random8() < chanceOfGlitter) {
+        leds[ random16(NUM_LEDS) ] += CRGB::White;
     }
+}
+
+void rainbowWithGlitter()
+{
+    // built-in FastLED rainbow, plus some random sparkly glitter
+    rainbow();
+    addGlitter(80);
+}
+
+void confetti()
+{
+  // random colored speckles that blink in and fade smoothly
+  fadeToBlackBy( leds, NUM_LEDS, 20);
+  int pos = random16(NUM_LEDS);
+  leds[pos] += CHSV( gHue + random8(64), 200, 255);
+}
+
+void sinelon()
+{
+  // a colored dot sweeping back and forth, with fading trails
+  fadeToBlackBy( leds, NUM_LEDS, 48);
+  LightState state = lightState.getCurrentState();
+
+  int pos = beatsin16( 13, 0, NUM_LEDS-1 );
+  // leds[pos] += CHSV( gHue, 255, 255);
+  leds[pos] += CRGB(state.color.r, state.color.g, state.color.b);
+}
+
+void bpm()
+{
+    // colored stripes pulsing at a defined Beats-Per-Minute (BPM)
+    uint8_t BeatsPerMinute = 64;
+    CRGBPalette16 palette = PartyColors_p;
+    uint8_t beat = beatsin8( BeatsPerMinute, 64, 255);
+    for( int i = 0; i < NUM_LEDS; i++) { //9948
+        leds[i] = ColorFromPalette(palette, gHue+(i*2), beat-gHue+(i*10));
+    }
+}
+
+void juggle() {
+  // eight colored dots, weaving in and out of sync with each other
+  fadeToBlackBy( leds, NUM_LEDS, 20);
+  byte dothue = 0;
+  for( int i = 0; i < 8; i++) {
+    leds[beatsin16( i+7, 0, NUM_LEDS-1 )] |= CHSV(dothue, 200, 255);
+    dothue += 32;
+  }
 }
 
 void loop() {
@@ -373,9 +547,16 @@ void loop() {
 
     LightState currentState = lightState.getCurrentState();
 
-    if (currentState.effect == "colorloop") {
-        runEffectColorloop();
-    }
+    currentCommand(); // a call to a function pointer.
+    currentEffect();  // a call to a function pointer.
+    if (currentState.effect == "Glitter Rainbow") rainbowWithGlitter();
+    if (currentState.effect == "Rainbow")         rainbow();
+    if (currentState.effect == "BPM")             bpm();
+    if (currentState.effect == "Confetti")        confetti();
+    if (currentState.effect == "Juggle")          juggle();
+    if (currentState.effect == "Sinelon")         sinelon();
 
-    delay(33);
+    fastLEDshowESP32();
+    // FastLED.show();
+    delay(1000/FPS);
 }

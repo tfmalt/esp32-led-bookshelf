@@ -63,7 +63,7 @@ class LightStateController {
         LightStateController();
         uint8_t                 initialize();
         LightStateController&   setCurrentState(const char* stateString);
-        LightState              newState(byte* payload);
+        LightState              parseNewState(byte* payload);
         LightState              getCurrentState();
         void                    printStateJsonTo(char* output);
 };

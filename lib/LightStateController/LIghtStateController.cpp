@@ -51,11 +51,10 @@ uint8_t LightStateController::initialize() {
     currentState.color.s    = (float) root["color"]["s"];
 
     file.close();
-    timestamp = millis();
     return 0;
 }
 
-LightState LightStateController::newState(byte* payload) {
+LightState LightStateController::parseNewState(byte* payload) {
     try {
         LightState newState = getLightStateFromPayload(payload);
         #ifdef DEBUG
@@ -75,16 +74,9 @@ LightState LightStateController::newState(byte* payload) {
         Serial.printf("ERROR: parsing of new state threw error: %s\n", error.c_str());
     }
 
-    unsigned long duration = millis();
-    if (duration < timestamp) timestamp = 0;
-    unsigned long diff = duration - timestamp;
+    Serial.println("  - Saving current state to file.");
+    saveCurrentState();
 
-    Serial.printf("DEBUG: time since last command: %lu ms\n", diff);
-    if (diff > 300000) {
-        Serial.println("  - diff is more than 5 minutes. Saving state");
-        timestamp = duration;
-        saveCurrentState();
-    }
     return currentState;
 }
 
@@ -197,8 +189,10 @@ LightState LightStateController::getLightStateFromPayload(byte* payload) {
     if (root.containsKey("effect")) {
         newState.status.hasEffect = true;
         newState.effect = root["effect"].as<String>();
-    } else {
-        newState.effect = "";
+
+        if (newState.effect == "none") {
+            newState.effect = "";
+        }
     }
 
     if (root.containsKey("color")) {
@@ -245,10 +239,6 @@ uint8_t LightStateController::saveCurrentState() {
 
     File file = SPIFFS.open(stateFile, "w+");
     current.prettyPrintTo(file);
-
-    // Serial.printf("DEBUG: writing to: %s\n", stateFile);
-    // current.prettyPrintTo(Serial);
-    // Serial.println();
 
     file.close();
     return LIGHT_STATEFILE_WROTE_SUCCESS;
