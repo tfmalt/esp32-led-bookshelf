@@ -230,8 +230,8 @@ void Effects::effectSinelon()
   LightState state = lightState->getCurrentState();
 
   int pos = beatsin16(18, 0, numberOfLeds-1 );
-  leds[pos] += CHSV( startHue, 255, 255);
-  // leds[pos] += CRGB(state.color.r, state.color.g, state.color.b);
+  // leds[pos] += CHSV( startHue, 255, 255);
+  leds[pos] += CRGB(state.color.r, state.color.g, state.color.b);
 }
 
 void Effects::effectBPM()
