@@ -54,7 +54,7 @@ uint8_t LightStateController::initialize() {
     return 0;
 }
 
-LightState LightStateController::parseNewState(byte* payload) {
+LightState& LightStateController::parseNewState(byte* payload) {
     try {
         LightState newState = getLightStateFromPayload(payload);
         #ifdef DEBUG
@@ -245,6 +245,6 @@ uint8_t LightStateController::saveCurrentState() {
 }
 
 
-LightState LightStateController::getCurrentState() {
+LightState& LightStateController::getCurrentState() {
     return currentState;
 }
