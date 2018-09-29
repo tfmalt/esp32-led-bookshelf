@@ -384,7 +384,6 @@ void setup()
 }
 
 void loop() {
-    // wait for WiFi connection
     if((WiFi.status() != WL_CONNECTED)) {
         Serial.println("WiFI not connected.");
         setupWifi();
@@ -393,7 +392,7 @@ void loop() {
     }
 
     if (!mqttClient.connected()) {
-        Serial.printf("Not connected to MQTT broker: %s\n", config.server.c_str());
+        Serial.printf("MQTT broker not connected: %s\n", config.server.c_str());
         connectMQTT();
     }
 
