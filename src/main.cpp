@@ -47,6 +47,7 @@ LightStateController  lightState;     // Own object. Responsible for state.
 WiFiClientSecure      wifiClient;
 PubSubClient          mqttClient;
 CRGB                  leds[NUM_LEDS];
+Effects               effects;
 
 uint8_t  gHue = 0; // rotating "base color" used by many of the patterns
 uint16_t commandFrames     = FPS;
@@ -62,29 +63,33 @@ void cmdEmpty()
 
 LightCommand currentCommand = cmdEmpty;
 LightCommand currentEffect  = cmdEmpty;
+//
+// void cmdSetBrightness()
+// {
+//     LightState state = lightState.getCurrentState();
+//
+//     uint8_t  target   = state.brightness;
+//     uint8_t  current  = FastLED.getBrightness();
+//
+//     if (commandFrameCount < commandFrames) {
+//         FastLED.setBrightness(current + ((target - current) / (commandFrames - commandFrameCount)));
+//         commandFrameCount++;
+//     } else {
+//         commandFrameCount = 0;
+//         commandFrames     = FPS;
+//         currentCommand    = cmdEmpty;
+//
+//         Serial.printf(
+//             "  - command: setting brightness DONE [%i] %lu ms.\n",
+//             FastLED.getBrightness(), (millis() - commandStart)
+//         );
+//     }
+// }
 
-void cmdSetBrightness()
+void cmdHandleEffects()
 {
-    LightState state = lightState.getCurrentState();
-
-    uint8_t  target   = state.brightness;
-    uint8_t  current  = FastLED.getBrightness();
-
-    if (commandFrameCount < commandFrames) {
-        FastLED.setBrightness(current + ((target - current) / (commandFrames - commandFrameCount)));
-        commandFrameCount++;
-    } else {
-        commandFrameCount = 0;
-        commandFrames     = FPS;
-        currentCommand    = cmdEmpty;
-
-        Serial.printf(
-            "  - command: setting brightness DONE [%i] %lu ms.\n",
-            FastLED.getBrightness(), (millis() - commandStart)
-        );
-    }
+    effects.runCurrentCommand();
 }
-
 /**
  * Helper function that blends one uint8_t toward another by a given amount
  * Taken from: https://gist.github.com/kriegsman/d0a5ed3c8f38c64adcb4837dafb6e690
@@ -321,9 +326,10 @@ void mqttCallback (char* p_topic, byte* p_message, unsigned int p_length)
         if(newState.status.hasBrightness)
         {
             Serial.printf("  - Got new brightness: '%i'\n", newState.brightness);
-            currentCommand = cmdSetBrightness;
-            commandFrames = (FPS * (newState.transition || 1));
-            commandStart = millis();
+            effects.setCurrentCommand(Effects::Command::Brightness);
+            currentCommand = cmdHandleEffects;
+            // commandFrames = (FPS * (newState.transition || 1));
+            // commandStart = millis();
         }
         else if(newState.status.hasColor) {
             Serial.println("  - Got color");
@@ -342,9 +348,11 @@ void mqttCallback (char* p_topic, byte* p_message, unsigned int p_length)
         // }
         else {
             // assuming turn on is the only thing.
-            currentCommand = cmdSetBrightness;
-            commandFrames = (FPS * (newState.transition || 1));
-            commandStart = millis();
+            effects.setCurrentCommand(Effects::Command::Brightness);
+            currentCommand = cmdHandleEffects;
+            // currentCommand = cmdSetBrightness;
+            // commandFrames = (FPS * (newState.transition || 1));
+            // commandStart = millis();
         }
     }
     else {
@@ -426,7 +434,11 @@ void setup()
 
     uint8_t result           = lightState.initialize();
     LightState currentState  = lightState.getCurrentState();
+    effects.setFPS(FPS);
+    effects.setLightStateController(&lightState);
+
     String resultString      = "";
+
 
     if (result == LIGHT_STATEFILE_NOT_FOUND)      resultString = "file not found";
     if (result == LIGHT_STATEFILE_JSON_FAILED)    resultString = "json failed";
