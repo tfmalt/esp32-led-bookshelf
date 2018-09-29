@@ -27,8 +27,8 @@
 FASTLED_USING_NAMESPACE
 
 // Fastled definitions
-static const uint8_t GPIO_DATA         = 15;
-static const uint8_t NUM_LEDS          = 31;
+static const uint8_t GPIO_DATA         = 18;
+static const uint8_t NUM_LEDS          = 60;
 static const uint8_t FPS               = 60;
 static const uint8_t FASTLED_SHOW_CORE = 0;
 
@@ -66,7 +66,6 @@ void cmdSetBrightness()
 {
     LightState state = lightState.getCurrentState();
 
-    uint16_t duration = state.transition || 1;
     uint8_t  target   = state.brightness;
     uint8_t  current  = FastLED.getBrightness();
 
@@ -497,13 +496,13 @@ void confetti()
   leds[pos] += CHSV( gHue + random8(64), 200, 255);
 }
 
+// a colored dot sweeping back and forth, with fading trails
 void sinelon()
 {
-  // a colored dot sweeping back and forth, with fading trails
-  fadeToBlackBy( leds, NUM_LEDS, 48);
+  fadeToBlackBy( leds, NUM_LEDS, 96 );
   LightState state = lightState.getCurrentState();
 
-  int pos = beatsin16( 13, 0, NUM_LEDS-1 );
+  int pos = beatsin16(18, 0, NUM_LEDS-1 );
   // leds[pos] += CHSV( gHue, 255, 255);
   leds[pos] += CRGB(state.color.r, state.color.g, state.color.b);
 }
