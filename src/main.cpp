@@ -209,8 +209,12 @@ uint8_t scaleHue(float h)
     return static_cast<uint8_t>(h*(256.0/360.0));
 }
 
+/**
+ * Looks over the new state and dispatches updates to effects and issues
+ * commands.
+ */
 void handleNewState(LightState state) {
-    // Handles the light setting logic. Should be moved to own function / object
+    Serial.println("DEBUG: Got new state:");
     if (state.state == true) {
         if(state.status.hasBrightness)
         {
@@ -223,6 +227,10 @@ void handleNewState(LightState state) {
                 effects.setCurrentCommand(Effects::Command::Color);
             }
             else {
+                Serial.printf(
+                    "    - Effect is: '%s' hue: %.2f\n",
+                    state.effect.c_str(), state.color.h
+                );
                 effects.setStartHue(scaleHue(state.color.h));
             }
         }
@@ -322,6 +330,34 @@ void connectMQTT()
     digitalWrite(BUILTIN_LED, LOW);
 }
 
+void setupFastLED()
+{
+    Serial.println("Setting up LED");
+    lightState.initialize();
+    LightState  currentState    = lightState.getCurrentState();
+
+    Serial.printf("  - state is: '%s'\n", currentState.state ? "On" : "Off");
+
+    FastLED.addLeds<WS2812B, GPIO_DATA, GRB>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
+    FastLED.setBrightness(currentState.state ? currentState.brightness : 0);
+
+    effects.setFPS(FPS);
+    effects.setLightStateController(&lightState);
+    effects.setLeds(leds, NUM_LEDS);
+    effects.setCurrentEffect(currentState.effect);
+    effects.setStartHue(scaleHue(currentState.color.h));
+
+    if (currentState.effect == "") {
+        effects.setCurrentCommand(Effects::Command::Color);
+    }
+
+    // -- Create the FastLED show task
+    xTaskCreatePinnedToCore(
+        FastLEDshowTask, "FastLEDshowTask", 2048, NULL, 2,
+        &FastLEDshowTaskHandle, FASTLED_SHOW_CORE
+    );
+}
+
 void setup()
 {
     Serial.begin(115200);
@@ -336,30 +372,6 @@ void setup()
         return;
     }
 
-    uint8_t result           = lightState.initialize();
-    LightState currentState  = lightState.getCurrentState();
-    effects.setFPS(FPS);
-    effects.setLightStateController(&lightState);
-    effects.setLeds(leds, NUM_LEDS);
-
-    String resultString      = "";
-
-    if (result == LIGHT_STATEFILE_NOT_FOUND)      resultString = "file not found";
-    if (result == LIGHT_STATEFILE_JSON_FAILED)    resultString = "json failed";
-    if (result == LIGHT_STATEFILE_PARSED_SUCCESS) resultString = "success";
-
-    Serial.printf("  - state initialize: %s\n", resultString.c_str());
-
-    #ifdef DEBUG
-    Serial.printf("  - DEBUG: current brightness: %i\n", currentState.brightness);
-    Serial.printf("  - DEBUG: current color_temp: %i\n", currentState.color_temp);
-    Serial.printf("  - DEBUG: current color: [%i, %i, %i, %0.2f, %0.2f]\n",
-        currentState.color.r, currentState.color.g, currentState.color.b,
-        currentState.color.h, currentState.color.s
-    );
-    Serial.printf("  - DEBUG: effect is set to '%s'\n", currentState.effect.c_str());
-    #endif
-
     readConfig();
     readCA();
     setupWifi();
@@ -368,21 +380,7 @@ void setup()
     // all examples I've seen has a startup grace delay.
     // Just cargo-cult copying that practise.
     delay(3000);
-
-    FastLED.addLeds<WS2812B, GPIO_DATA, GRB>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
-
-    FastLED.setBrightness(currentState.brightness);
-    effects.setCurrentCommand(Effects::Command::Color);
-
-    int core = xPortGetCoreID();
-    Serial.print("Main code running on core ");
-    Serial.println(core);
-
-    // -- Create the FastLED show task
-    xTaskCreatePinnedToCore(
-        FastLEDshowTask, "FastLEDshowTask", 2048, NULL, 2,
-        &FastLEDshowTaskHandle, FASTLED_SHOW_CORE
-    );
+    setupFastLED();
 }
 
 void loop() {
