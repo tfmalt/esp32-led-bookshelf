@@ -23,6 +23,7 @@
 #include <FastLED.h>
 #include <LedShelf.h>
 #include <LightStateController.h>
+#include <Effects.h>
 
 FASTLED_USING_NAMESPACE
 
