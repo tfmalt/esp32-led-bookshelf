@@ -234,9 +234,11 @@ void Effects::effectSinelon()
   leds[pos] += CRGB(state.color.r, state.color.g, state.color.b);
 }
 
+/**
+ * colored stripes pulsing at a defined Beats-Per-Minute (BPM)
+ */
 void Effects::effectBPM()
 {
-    // colored stripes pulsing at a defined Beats-Per-Minute (BPM)
     uint8_t BeatsPerMinute = 64;
     CRGBPalette16 palette = PartyColors_p;
     uint8_t beat = beatsin8( BeatsPerMinute, 64, 255);
@@ -245,8 +247,11 @@ void Effects::effectBPM()
     }
 }
 
-void Effects::effectJuggle() {
-  // eight colored dots, weaving in and out of sync with each other
+/**
+ * eight colored dots, weaving in and out of sync with each other
+ */
+void Effects::effectJuggle()
+{
   fadeToBlackBy( leds, numberOfLeds, 20);
   byte dothue = 0;
   for( int i = 0; i < 8; i++) {
@@ -255,10 +260,12 @@ void Effects::effectJuggle() {
   }
 }
 
-Effects::Effect Effects::getCurrentEffect() {
+Effects::Effect Effects::getCurrentEffect()
+{
     return currentEffectType;
 }
 
-void Effects::setStartHue(uint8_t hue) {
+void Effects::setStartHue(uint8_t hue)
+{
     startHue = hue;
 }

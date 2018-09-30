@@ -1,10 +1,16 @@
+/**
+ * Class responsible for keeping track of the state of the light.
+ *
+ * Copyright 2018 Thomas Malt <thomas@malt.no>
+ */
 #include "LightStateController.h"
 #include <debug.h>
 #include <SPIFFS.h>
 #include <FS.h>
 #include <ArduinoJson.h>
 
-LightStateController::LightStateController() {
+LightStateController::LightStateController()
+{
     Color defaultColor = {0};
 
     LightStatus defaultStatus = {false};
@@ -18,14 +24,16 @@ LightStateController::LightStateController() {
     defaultState.status     = defaultStatus;
 }
 
-LightStateController& LightStateController::setCurrentState(const char* stateString) {
+LightStateController& LightStateController::setCurrentState(const char* stateString)
+{
     Serial.println("DEBUG: LightStateController up and running.");
     Serial.printf("  - %s\n", stateFile);
     Serial.printf("  - %i\n", currentState.color_temp);
     return *this;
 }
 
-uint8_t LightStateController::initialize() {
+uint8_t LightStateController::initialize()
+{
     currentState = defaultState;
     Serial.printf("DEBUG: Reading in '%s'\n", stateFile);
     File file = SPIFFS.open(stateFile, "r");
@@ -54,7 +62,8 @@ uint8_t LightStateController::initialize() {
     return 0;
 }
 
-LightState& LightStateController::parseNewState(byte* payload) {
+LightState& LightStateController::parseNewState(byte* payload)
+{
     try {
         LightState newState = getLightStateFromPayload(payload);
         #ifdef DEBUG
@@ -80,7 +89,8 @@ LightState& LightStateController::parseNewState(byte* payload) {
     return currentState;
 }
 
-void LightStateController::printStateDebug(LightState& state) {
+void LightStateController::printStateDebug(LightState& state)
+{
     #ifdef DEBUG
     Serial.println("DEBUG: got new LightState:");
     Serial.printf(
@@ -119,7 +129,8 @@ void LightStateController::printStateDebug(LightState& state) {
 /**
  * Takes a JsonObject reference and returns a color struct.
  */
-Color LightStateController::getColorFromJsonObject(JsonObject& root) {
+Color LightStateController::getColorFromJsonObject(JsonObject& root)
+{
     Color color = {0};
 
     if (!root.containsKey("color")) return color;
@@ -137,7 +148,8 @@ Color LightStateController::getColorFromJsonObject(JsonObject& root) {
     return color;
 }
 
-LightState LightStateController::getLightStateFromPayload(byte* payload) {
+LightState LightStateController::getLightStateFromPayload(byte* payload)
+{
     StaticJsonBuffer<256>   jsonBuffer;
     JsonObject&             root     = jsonBuffer.parseObject(payload);
     LightState              newState = currentState;
@@ -204,7 +216,8 @@ LightState LightStateController::getLightStateFromPayload(byte* payload) {
     return newState;
 }
 
-void LightStateController::printStateJsonTo(char* output) {
+void LightStateController::printStateJsonTo(char* output)
+{
     StaticJsonBuffer<256> jsonBuffer;
     JsonObject& object  = jsonBuffer.createObject();
     JsonObject& color   = jsonBuffer.createObject();
@@ -213,7 +226,8 @@ void LightStateController::printStateJsonTo(char* output) {
     current.printTo(output, 256);
 }
 
-JsonObject& LightStateController::createCurrentStateJsonObject(JsonObject& object, JsonObject& color) {
+JsonObject& LightStateController::createCurrentStateJsonObject(JsonObject& object, JsonObject& color)
+{
     LightState state = getCurrentState();
 
     color["r"] = state.color.r;
@@ -231,7 +245,8 @@ JsonObject& LightStateController::createCurrentStateJsonObject(JsonObject& objec
     return object;
 }
 
-uint8_t LightStateController::saveCurrentState() {
+uint8_t LightStateController::saveCurrentState()
+{
     StaticJsonBuffer<256> jsonBuffer;
     JsonObject& object = jsonBuffer.createObject();
     JsonObject& color = jsonBuffer.createObject();
@@ -245,6 +260,7 @@ uint8_t LightStateController::saveCurrentState() {
 }
 
 
-LightState& LightStateController::getCurrentState() {
+LightState& LightStateController::getCurrentState()
+{
     return currentState;
 }
