@@ -46,6 +46,14 @@ typedef struct LightState {
 } LightState;
 
 class LightStateController {
+    public:
+        LightStateController();
+        uint8_t                 initialize();
+        LightStateController&   setCurrentState(const char* stateString);
+        LightState&             parseNewState(byte* payload);
+        LightState&             getCurrentState();
+        void                    printStateJsonTo(char* output);
+
     private:
         LightState  currentState = {0};
         LightState  defaultState = {0};
@@ -58,14 +66,6 @@ class LightStateController {
         void        printStateDebug(LightState& state);
         JsonObject& createCurrentStateJsonObject(JsonObject& object, JsonObject& color);
         uint8_t     saveCurrentState();
-
-    public:
-        LightStateController();
-        uint8_t                 initialize();
-        LightStateController&   setCurrentState(const char* stateString);
-        LightState&             parseNewState(byte* payload);
-        LightState&             getCurrentState();
-        void                    printStateJsonTo(char* output);
 };
 
-#endif // LightStateControlller_h
+#endif // LightStateController_h

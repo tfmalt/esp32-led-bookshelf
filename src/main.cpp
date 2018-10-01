@@ -15,13 +15,10 @@
 
 #include <debug.h>
 #include <Arduino.h>
-#include <FS.h>
-#include <SPIFFS.h>
-#include <ArduinoJson.h>
 #include <WiFiClientSecure.h>
 #include <PubSubClient.h>
 #include <FastLED.h>
-#include <LedShelf.h>
+#include <LedshelfConfig.h>
 #include <LightStateController.h>
 #include <Effects.h>
 
@@ -41,8 +38,7 @@ static TaskHandle_t userTaskHandle          = 0;
 // A command to hold the command we're currently executing.
 
 // global objects
-String                ca_root;        // CA Root certificate for TLS
-Config                config;         // Struct parsed from json config file.
+LedshelfConfig        config;         // Struct parsed from json config file.
 LightStateController  lightState;     // Own object. Responsible for state.
 WiFiClientSecure      wifiClient;
 PubSubClient          mqttClient;
@@ -99,66 +95,6 @@ void FastLEDshowTask(void *pvParameters)
     }
 }
 
-
-void readConfig()
-{
-    static const char* path = "/config.json";
-    // String data;
-
-    Serial.printf("Reading config file: %s\n", path);
-
-    File file = SPIFFS.open(path, "r");
-    if(!file) {
-        Serial.println("  - failed to open file for reading");
-        return;
-    }
-
-    StaticJsonBuffer<512> configBuffer;
-    JsonObject& root = configBuffer.parseObject(file);
-
-    if (!root.success()) {
-        Serial.println("  - parsing jsonBuffer failed");
-        return;
-    }
-
-    config.ssid          = (const char*) root["ssid"];
-    config.psk           = (const char*) root["psk"];
-    config.server        = (const char*) root["server"];
-    config.port          = (int)         root["port"];
-    config.username      = (const char*) root["username"];
-    config.password      = (const char*) root["password"];
-    config.client        = (const char*) root["client"];
-    config.command_topic = (const char*) root["command_topic"];
-    config.state_topic   = (const char*) root["state_topic"];
-    config.status_topic  = (const char*) root["status_topic"];
-
-    file.close();
-}
-
-/**
- * Reads the TLS CA Root Certificate from file.
- */
-void readCA()
-{
-    static const char* path = "/ca.pem";
-    Serial.printf("Reading CA file: %s\n", path);
-
-    File file = SPIFFS.open(path, "r");
-
-    if (!file) {
-        Serial.printf("  - Failed to open %s for reading\n", path);
-        return;
-    }
-
-    ca_root = "";
-    while (file.available()) {
-        ca_root += file.readString();
-    }
-
-    file.close();
-}
-
-
 /**
  * Configure and setup wifi
  */
@@ -168,9 +104,9 @@ void setupWifi()
 
     delay(10);
 
-    Serial.printf("Connecting to: %s ", config.ssid.c_str());
+    Serial.printf("Connecting to: %s ", config.ssid());
 
-    WiFi.begin(config.ssid.c_str(), config.psk.c_str());
+    WiFi.begin(config.ssid(), config.psk());
 
     while (WiFi.status() != WL_CONNECTED) {
         digitalWrite(BUILTIN_LED, HIGH);
@@ -201,7 +137,7 @@ void mqttPublishState()
 {
     char json[256];
     lightState.printStateJsonTo(json);
-    mqttClient.publish(config.state_topic.c_str(), json, true);
+    mqttClient.publish(config.state_topic(), json, true);
 }
 
 uint8_t scaleHue(float h)
@@ -322,7 +258,7 @@ void mqttCallback (char* p_topic, byte* p_message, unsigned int p_length)
 
     Serial.printf("INFO: New MQTT message: '%s'\n", p_topic);
 
-    if (!String(config.command_topic).equals(p_topic)) {
+    if (!String(config.command_topic()).equals(p_topic)) {
         Serial.printf("  - ERROR: Not a valid topic: '%s'. IGNORING\n", p_topic);
         digitalWrite(BUILTIN_LED, LOW);
         return;
@@ -339,12 +275,12 @@ void mqttCallback (char* p_topic, byte* p_message, unsigned int p_length)
 
 void setupMQTT()
 {
-    wifiClient.setCACert(ca_root.c_str());
+    wifiClient.setCACert(config.ca_root());
 
-    Serial.printf("Setting up MQTT Client: %s %i\n", config.server.c_str(), config.port);
+    Serial.printf("Setting up MQTT Client: %s %i\n", config.server(), config.port());
 
     mqttClient.setClient(wifiClient);
-    mqttClient.setServer(config.server.c_str(), config.port);
+    mqttClient.setServer(config.server(), config.port());
     mqttClient.setCallback(mqttCallback);
 }
 
@@ -352,31 +288,29 @@ void connectMQTT()
 {
     digitalWrite(BUILTIN_LED, HIGH);
     IPAddress mqttip;
-    WiFi.hostByName(config.server.c_str(), mqttip);
+    WiFi.hostByName(config.server(), mqttip);
 
-    Serial.printf("  - %s = ", config.server.c_str());
+    Serial.printf("  - %s = ", config.server());
     Serial.println(mqttip);
 
     while (!mqttClient.connected()) {
         Serial.printf(
             "Attempting MQTT connection to \"%s\" \"%i\" as \"%s\" ... ",
-            config.server.c_str(), config.port, config.username.c_str()
+            config.server(), config.port(), config.username()
         );
 
         if (mqttClient.connect(
-            config.client.c_str(),
-            config.username.c_str(),
-            config.password.c_str(),
-            config.status_topic.c_str(),
+            config.client(),
+            config.username(),
+            config.password(),
+            config.status_topic(),
             0, true, "Disconnected")
         ) {
             Serial.println(" connected");
-            Serial.print("  - status: ");
-            Serial.println(config.status_topic);
-            Serial.print("  - command: ");
-            Serial.println(config.command_topic);
-            mqttClient.publish(config.status_topic.c_str(), "Online", true);
-            mqttClient.subscribe(config.command_topic.c_str());
+            Serial.printf("  - status:  '%s'\n", config.status_topic());
+            Serial.printf("  - command: '%s'\n", config.command_topic());
+            mqttClient.publish(config.status_topic(), "Online", true);
+            mqttClient.subscribe(config.command_topic());
         }
         else {
             Serial.print(" failed: ");
@@ -422,17 +356,8 @@ void setup()
     Serial.begin(115200);
     Serial.printf("Starting...\n");
 
-    if (SPIFFS.begin()) {
-        Serial.println("  - Mounting SPIFFS file system.");
-    }
-    else {
-        Serial.println("  - ERROR: Could not mount SPIFFS.");
-        ESP.restart();
-        return;
-    }
+    config.setup();
 
-    readConfig();
-    readCA();
     setupWifi();
     setupMQTT();
 
@@ -451,13 +376,11 @@ void loop() {
     }
 
     if (!mqttClient.connected()) {
-        Serial.printf("MQTT broker not connected: %s\n", config.server.c_str());
+        Serial.printf("MQTT broker not connected: %s\n", config.server());
         connectMQTT();
     }
 
     mqttClient.loop();
-
-    LightState& currentState = lightState.getCurrentState();
 
     effects.runCurrentCommand();
     effects.runCurrentEffect();
