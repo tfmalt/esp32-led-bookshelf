@@ -67,7 +67,7 @@ class Effects {
         void setCommandFrames(uint16_t i);
         void setLeds(CRGB *l, const uint8_t &n);
         Effect getCurrentEffect();
-        void setStartHue(uint8_t hue);
+        void setStartHue(float hue);
 };
 
 #endif // Effects_h

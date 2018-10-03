@@ -265,7 +265,7 @@ Effects::Effect Effects::getCurrentEffect()
     return currentEffectType;
 }
 
-void Effects::setStartHue(uint8_t hue)
+void Effects::setStartHue(float hue)
 {
-    startHue = hue;
+    startHue = static_cast<uint8_t>(hue*(256.0/360.0));
 }
