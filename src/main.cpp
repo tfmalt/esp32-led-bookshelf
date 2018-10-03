@@ -15,7 +15,7 @@
 
 #include <debug.h>
 #include <Arduino.h>
-#include <WiFiClientSecure.h>
+#include <WiFiController.h>
 #include <PubSubClient.h>
 #include <FastLED.h>
 #include <LedshelfConfig.h>
@@ -38,11 +38,11 @@ static TaskHandle_t userTaskHandle          = 0;
 // A command to hold the command we're currently executing.
 
 // global objects
-LedshelfConfig        config;         // Struct parsed from json config file.
+LedshelfConfig        config;         // read from json config file.
 LightStateController  lightState;     // Own object. Responsible for state.
-WiFiClientSecure      wifiClient;
+WiFiController        wifiCtrl;
 PubSubClient          mqttClient;
-CRGB                  leds[NUM_LEDS];
+CRGBArray<NUM_LEDS>   leds;
 Effects               effects;
 
 uint16_t commandFrames     = FPS;
@@ -95,33 +95,6 @@ void FastLEDshowTask(void *pvParameters)
     }
 }
 
-/**
- * Configure and setup wifi
- */
-void setupWifi()
-{
-    digitalWrite(BUILTIN_LED, LOW);
-
-    delay(10);
-
-    Serial.printf("Connecting to: %s ", config.ssid());
-
-    WiFi.begin(config.ssid(), config.psk());
-
-    while (WiFi.status() != WL_CONNECTED) {
-        digitalWrite(BUILTIN_LED, HIGH);
-        Serial.print(".");
-        delay(500);
-        digitalWrite(BUILTIN_LED, LOW);
-    }
-
-    Serial.println(" WiFi connected");
-    Serial.print("  - IP address: ");
-    Serial.println(WiFi.localIP());
-    Serial.print("  - DNS: ");
-    Serial.println(WiFi.dnsIP());
-}
-
 String mqttPaylodToString(byte* p_payload, unsigned int p_length)
 {
     String message;
@@ -137,7 +110,7 @@ void mqttPublishState()
 {
     char json[256];
     lightState.printStateJsonTo(json);
-    mqttClient.publish(config.state_topic(), json, true);
+    mqttClient.publish(config.state_topic.c_str(), json, true);
 }
 
 uint8_t scaleHue(float h)
@@ -258,7 +231,7 @@ void mqttCallback (char* p_topic, byte* p_message, unsigned int p_length)
 
     Serial.printf("INFO: New MQTT message: '%s'\n", p_topic);
 
-    if (!String(config.command_topic()).equals(p_topic)) {
+    if (!config.command_topic.equals(p_topic)) {
         Serial.printf("  - ERROR: Not a valid topic: '%s'. IGNORING\n", p_topic);
         digitalWrite(BUILTIN_LED, LOW);
         return;
@@ -275,12 +248,12 @@ void mqttCallback (char* p_topic, byte* p_message, unsigned int p_length)
 
 void setupMQTT()
 {
-    wifiClient.setCACert(config.ca_root());
+    wifiCtrl.getWiFiClient().setCACert(config.ca_root.c_str());
 
-    Serial.printf("Setting up MQTT Client: %s %i\n", config.server(), config.port());
+    Serial.printf("Setting up MQTT Client: %s %i\n", config.server.c_str(), config.port);
 
-    mqttClient.setClient(wifiClient);
-    mqttClient.setServer(config.server(), config.port());
+    mqttClient.setClient(wifiCtrl.getWiFiClient());
+    mqttClient.setServer(config.server.c_str(), config.port);
     mqttClient.setCallback(mqttCallback);
 }
 
@@ -288,29 +261,29 @@ void connectMQTT()
 {
     digitalWrite(BUILTIN_LED, HIGH);
     IPAddress mqttip;
-    WiFi.hostByName(config.server(), mqttip);
+    WiFi.hostByName(config.server.c_str(), mqttip);
 
-    Serial.printf("  - %s = ", config.server());
+    Serial.printf("  - %s = ", config.server.c_str());
     Serial.println(mqttip);
 
     while (!mqttClient.connected()) {
         Serial.printf(
             "Attempting MQTT connection to \"%s\" \"%i\" as \"%s\" ... ",
-            config.server(), config.port(), config.username()
+            config.server.c_str(), config.port, config.username.c_str()
         );
 
         if (mqttClient.connect(
-            config.client(),
-            config.username(),
-            config.password(),
-            config.status_topic(),
+            config.client.c_str(),
+            config.username.c_str(),
+            config.password.c_str(),
+            config.status_topic.c_str(),
             0, true, "Disconnected")
         ) {
             Serial.println(" connected");
-            Serial.printf("  - status:  '%s'\n", config.status_topic());
-            Serial.printf("  - command: '%s'\n", config.command_topic());
-            mqttClient.publish(config.status_topic(), "Online", true);
-            mqttClient.subscribe(config.command_topic());
+            Serial.printf("  - status:  '%s'\n", config.status_topic.c_str());
+            Serial.printf("  - command: '%s'\n", config.command_topic.c_str());
+            mqttClient.publish(config.status_topic.c_str(), "Online", true);
+            mqttClient.subscribe(config.command_topic.c_str());
         }
         else {
             Serial.print(" failed: ");
@@ -334,9 +307,15 @@ void setupFastLED()
     FastLED.addLeds<WS2812B, GPIO_DATA, GRB>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
     FastLED.setBrightness(currentState.state ? currentState.brightness : 0);
 
+    CRGBSet testset = leds(0,9);
+    // for (int i = 0; i < 10; i++) {
+    //     testset[i] = leds[i];
+    // }
+     //  + leds(20,29) + leds(40,49);
+
     effects.setFPS(FPS);
     effects.setLightStateController(&lightState);
-    effects.setLeds(leds, NUM_LEDS);
+    effects.setLeds(testset, 10);
     effects.setCurrentEffect(currentState.effect);
     effects.setStartHue(scaleHue(currentState.color.h));
 
@@ -357,8 +336,7 @@ void setup()
     Serial.printf("Starting...\n");
 
     config.setup();
-
-    setupWifi();
+    wifiCtrl = WiFiController(config.ssid.c_str(), config.psk.c_str());
     setupMQTT();
 
     // all examples I've seen has a startup grace delay.
@@ -369,14 +347,13 @@ void setup()
 
 void loop() {
     if((WiFi.status() != WL_CONNECTED)) {
-        Serial.println("WiFI not connected.");
-        setupWifi();
+        wifiCtrl.connect();
         delay(500);
         return;
     }
 
     if (!mqttClient.connected()) {
-        Serial.printf("MQTT broker not connected: %s\n", config.server());
+        Serial.printf("MQTT broker not connected: %s\n", config.server.c_str());
         connectMQTT();
     }
 
