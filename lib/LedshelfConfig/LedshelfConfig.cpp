@@ -5,10 +5,7 @@
 #include <SPIFFS.h>
 #include <ArduinoJson.h>
 
-LedshelfConfig::LedshelfConfig()
-{
 
-}
 void LedshelfConfig::setup()
 {
     if (SPIFFS.begin()) {

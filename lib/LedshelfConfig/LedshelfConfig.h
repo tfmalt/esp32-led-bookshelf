@@ -7,19 +7,33 @@
 
 class LedshelfConfig {
     public:
-        LedshelfConfig();
+        LedshelfConfig() :
+            ca_root(ca_root_data),
+            ssid(wifi_ssid),
+            psk(wifi_psk),
+            server(mqtt_server),
+            state_topic(mqtt_state_topic),
+            command_topic(mqtt_command_topic),
+            status_topic(mqtt_status_topic),
+            port(mqtt_port),
+            username(mqtt_username),
+            password(mqtt_password),
+            client(mqtt_client)
+        {};
+
         void setup();
-        const char* ssid()          const { return wifi_ssid.c_str(); };
-        const char* psk()           const { return wifi_psk.c_str(); };
-        const char* state_topic()   const { return mqtt_state_topic.c_str(); };
-        const char* command_topic() const { return mqtt_command_topic.c_str(); };
-        const char* status_topic()  const { return mqtt_status_topic.c_str(); };
-        const char* server()        const { return mqtt_server.c_str(); };
-        uint16_t    port()          const { return mqtt_port; };
-        const char* username()      const { return mqtt_username.c_str(); };
-        const char* password()      const { return mqtt_password.c_str(); };
-        const char* client()        const { return mqtt_client.c_str(); };
-        const char* ca_root()       const { return ca_root_data.c_str(); };
+
+        const String   &ca_root;
+        const String   &ssid;
+        const String   &psk;
+        const String   &server;
+        const String   &state_topic;
+        const String   &command_topic;
+        const String   &status_topic;
+        const uint16_t &port;
+        const String   &username;
+        const String   &password;
+        const String   &client;
 
     private:
         const String configFile = "/config.json";
