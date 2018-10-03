@@ -226,7 +226,7 @@ void Effects::effectConfetti()
 // a colored dot sweeping back and forth, with fading trails
 void Effects::effectSinelon()
 {
-  fadeToBlackBy( leds, numberOfLeds, 96 );
+  fadeToBlackBy( leds, numberOfLeds, 60 );
   LightState state = lightState->getCurrentState();
 
   int pos = beatsin16(18, 0, numberOfLeds-1 );
