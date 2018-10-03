@@ -307,15 +307,9 @@ void setupFastLED()
     FastLED.addLeds<WS2812B, GPIO_DATA, GRB>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
     FastLED.setBrightness(currentState.state ? currentState.brightness : 0);
 
-    CRGBSet testset = leds(0,9);
-    // for (int i = 0; i < 10; i++) {
-    //     testset[i] = leds[i];
-    // }
-     //  + leds(20,29) + leds(40,49);
-
     effects.setFPS(FPS);
     effects.setLightStateController(&lightState);
-    effects.setLeds(testset, 10);
+    effects.setLeds(leds, NUM_LEDS);
     effects.setCurrentEffect(currentState.effect);
     effects.setStartHue(scaleHue(currentState.color.h));
 
@@ -336,21 +330,23 @@ void setup()
     Serial.printf("Starting...\n");
 
     config.setup();
-    wifiCtrl = WiFiController(config.ssid.c_str(), config.psk.c_str());
+    wifiCtrl.setup(config.ssid, config.psk);
+    wifiCtrl.connect();
+
     setupMQTT();
 
     // all examples I've seen has a startup grace delay.
     // Just cargo-cult copying that practise.
-    delay(3000);
+    delay(2000);
     setupFastLED();
 }
 
 void loop() {
-    if((WiFi.status() != WL_CONNECTED)) {
-        wifiCtrl.connect();
-        delay(500);
-        return;
-    }
+    // if((WiFi.status() != WL_CONNECTED)) {
+    //     wifiCtrl.connect();
+    //     delay(500);
+    //     return;
+    // }
 
     if (!mqttClient.connected()) {
         Serial.printf("MQTT broker not connected: %s\n", config.server.c_str());
