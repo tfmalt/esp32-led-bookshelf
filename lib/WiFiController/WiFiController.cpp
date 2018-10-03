@@ -2,14 +2,16 @@
 #include <WiFiClientSecure.h>
 
 
-void WiFiController::setup(String ssid_i, String psk_i)
+void WiFiController::setup(const char* ssid_i, const char* psk_i, const char* ca)
 {
-    ssid_p = ssid_i;
-    psk_p  = psk_i;
+    ssid = ssid_i;
+    psk  = psk_i;
 
     WiFi.onEvent([this](WiFiEvent_t event, WiFiEventInfo_t info) {
         handleEvent(event);
     });
+
+    wifiClient.setCACert(ca);
 }
 
 /**
@@ -17,9 +19,9 @@ void WiFiController::setup(String ssid_i, String psk_i)
  */
 void WiFiController::connect()
 {
-    Serial.printf("Connecting to: %s:\n", ssid.c_str());
+    Serial.printf("Connecting to: %s:\n", ssid);
 
-    WiFi.begin(ssid.c_str(), psk.c_str());
+    WiFi.begin(ssid, psk);
 
     // Wait here until we are connected.
     while (WiFi.status() != WL_CONNECTED) {
@@ -78,15 +80,16 @@ void WiFiController::handleEvent(WiFiEvent_t event)
         // SYSTEM_EVENT_STA_CONNECTED            < ESP32 station connected to AP
         case SYSTEM_EVENT_STA_CONNECTED :
             WiFi.enableIpV6();
-            Serial.printf("  - Connected to access point [%s][%i]\n", ssid.c_str(), event);
+            Serial.printf("  - Connected to access point [%s][%i]\n", ssid, event);
             // testOutput();
             break;
         // SYSTEM_EVENT_STA_DISCONNECTED         < ESP32 station disconnected from AP
         case SYSTEM_EVENT_STA_DISCONNECTED :
             Serial.printf("WIFI: got SYSTEM_EVENT_STA_DISCONNECTED [%i]\n", event);
-            Serial.println("  - implement wifi reconnect here.");
+            Serial.println("  - reconnecting...");
             // sleeping for half a second to let things settle
             delay(500);
+            connect();
             break;
         // SYSTEM_EVENT_STA_AUTHMODE_CHANGE      < the auth mode of AP connected by ESP32 station changed
         case SYSTEM_EVENT_STA_AUTHMODE_CHANGE :

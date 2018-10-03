@@ -10,28 +10,21 @@
 
 class WiFiController {
     public:
-        WiFiController() :
-            ssid(ssid_p),
-            psk(psk_p)
+        WiFiController()
         {
             WiFi.disconnect(true);
         };
 
-        void                setup(String ssid_i, String psk_i);
+        void                setup(const char* ssid_i, const char* psk_i, const char* ca);
         void                connect();
         void                testOutput();
         WiFiClientSecure&   getWiFiClient();
 
-        const String &ssid;
-        const String &psk;
-
     private:
         WiFiClientSecure    wifiClient;
-        String         ssid_p;
-        String         psk_p;
+        const char*         ssid;
+        const char*         psk;
 
-        // typedef void (WiFiController::*EventHandler)(WiFiEvent_t event);
-        // EventHandler eventHandler;
         void handleEvent(WiFiEvent_t event);
 };
 
