@@ -26,7 +26,7 @@ FASTLED_USING_NAMESPACE
 
 // Fastled definitions
 static const uint8_t GPIO_DATA         = 18;
-static const uint8_t NUM_LEDS          = 60;
+static const uint8_t NUM_LEDS          = 150;
 static const uint8_t FPS               = 60;
 static const uint8_t FASTLED_SHOW_CORE = 0;
 
@@ -88,6 +88,7 @@ void FastLEDshowTask(void *pvParameters)
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 
         // -- Do the show (synchronously)
+        // Serial.printf("ESP: Running fastled.show(): %ld\n", millis());
         FastLED.show();
 
         // -- Notify the calling task
@@ -129,7 +130,7 @@ void setup()
     Serial.printf("Starting...\n");
 
     config.setup();
-    wifiCtrl.setup(config.ssid.c_str(), config.psk.c_str(), config.ca_root.c_str());
+    wifiCtrl.setup(&config);
     mqttCtrl.setup(&wifiCtrl, &lightState, &config, &effects);
 
     wifiCtrl.connect();
@@ -147,7 +148,7 @@ void loop() {
     effects.runCurrentCommand();
     effects.runCurrentEffect();
 
-    fastLEDshowESP32();
-    // FastLED.show();
+    // fastLEDshowESP32();
+    FastLED.show();
     delay(1000/FPS);
 }

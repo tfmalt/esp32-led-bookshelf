@@ -229,7 +229,10 @@ void Effects::effectSinelon()
   fadeToBlackBy( leds, numberOfLeds, 60 );
   LightState state = lightState->getCurrentState();
 
-  int pos = beatsin16(18, 0, numberOfLeds-1 );
+    // calculate a suiting pulserate for the number of leds.
+  uint8_t bpm = 1000 / numberOfLeds;
+
+  int pos = beatsin16(bpm, 0, numberOfLeds-1 );
   // leds[pos] += CHSV( startHue, 255, 255);
   leds[pos] += CRGB(state.color.r, state.color.g, state.color.b);
 }

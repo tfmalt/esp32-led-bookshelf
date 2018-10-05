@@ -1,17 +1,17 @@
 #include "WiFiController.h"
 #include <WiFiClientSecure.h>
+#include <LedshelfConfig.h>
 
 
-void WiFiController::setup(const char* ssid_i, const char* psk_i, const char* ca)
+void WiFiController::setup(LedshelfConfig* c)
 {
-    ssid = ssid_i;
-    psk  = psk_i;
+    config = c;
 
     WiFi.onEvent([this](WiFiEvent_t event, WiFiEventInfo_t info) {
         handleEvent(event);
     });
 
-    wifiClient.setCACert(ca);
+    wifiClient.setCACert(config->ca_root.c_str());
 }
 
 /**
@@ -19,9 +19,9 @@ void WiFiController::setup(const char* ssid_i, const char* psk_i, const char* ca
  */
 void WiFiController::connect()
 {
-    Serial.printf("Connecting to: %s:\n", ssid);
+    Serial.printf("Connecting to: %s:\n", config->ssid.c_str());
 
-    WiFi.begin(ssid, psk);
+    WiFi.begin(config->ssid.c_str(), config->psk.c_str());
 
     // Wait here until we are connected.
     while (WiFi.status() != WL_CONNECTED) {
@@ -36,7 +36,7 @@ WiFiClientSecure& WiFiController::getWiFiClient() {
 void WiFiController::testOutput()
 {
     Serial.printf("    - Testing output.\n");
-    Serial.println(ssid);
+    Serial.println(config->ssid.c_str());
 }
 
 void WiFiController::handleEvent(WiFiEvent_t event)
@@ -80,8 +80,7 @@ void WiFiController::handleEvent(WiFiEvent_t event)
         // SYSTEM_EVENT_STA_CONNECTED            < ESP32 station connected to AP
         case SYSTEM_EVENT_STA_CONNECTED :
             WiFi.enableIpV6();
-            Serial.printf("  - Connected to access point [%s][%i]\n", ssid, event);
-            // testOutput();
+            Serial.printf("  - Connected to access point [%s][%i]\n", config->ssid.c_str(), event);
             break;
         // SYSTEM_EVENT_STA_DISCONNECTED         < ESP32 station disconnected from AP
         case SYSTEM_EVENT_STA_DISCONNECTED :

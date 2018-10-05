@@ -7,6 +7,7 @@
 
 #include <Arduino.h>
 #include <WiFiClientSecure.h>
+#include <LedshelfConfig.h>
 
 class WiFiController {
     public:
@@ -15,15 +16,14 @@ class WiFiController {
             WiFi.disconnect(true);
         };
 
-        void                setup(const char* ssid_i, const char* psk_i, const char* ca);
+        void                setup(LedshelfConfig* c);
         void                connect();
         void                testOutput();
         WiFiClientSecure&   getWiFiClient();
 
     private:
         WiFiClientSecure    wifiClient;
-        const char*         ssid;
-        const char*         psk;
+        LedshelfConfig*     config;
 
         void handleEvent(WiFiEvent_t event);
 };
