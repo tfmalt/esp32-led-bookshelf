@@ -56,10 +56,8 @@ void MQTTController::publishState()
  */
 void MQTTController::callback (char* p_topic, byte* p_message, unsigned int p_length)
 {
-    Serial.printf("INFO: New MQTT message: '%s'\n", p_topic);
-
     if (!config->command_topic.equals(p_topic)) {
-        Serial.printf("  - ERROR: Not a valid topic: '%s'. IGNORING\n", p_topic);
+        Serial.printf("- ERROR: Not a valid topic: '%s'. IGNORING\n", p_topic);
         return;
     }
 
@@ -74,16 +72,15 @@ void MQTTController::callback (char* p_topic, byte* p_message, unsigned int p_le
  * commands.
  */
 void MQTTController::handleNewState(LightState& state) {
-    Serial.println("DEBUG: Got new state:");
     if (state.state == false) {
-        Serial.println("  - Told to turn off");
+        Serial.println("- Told to turn off");
         FastLED.setBrightness(0);
         return;
     }
 
     if(state.status.hasBrightness)
     {
-        Serial.printf("  - Got new brightness: '%i'\n", state.brightness);
+        Serial.printf("- Got new brightness: '%i'\n", state.brightness);
         effects->setCurrentCommand(Effects::Command::Brightness);
     }
     else if(state.status.hasColor) {

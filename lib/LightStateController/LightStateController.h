@@ -4,6 +4,7 @@
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
+#include <map>
 
 #define LIGHT_STATEFILE_PARSED_SUCCESS  0
 #define LIGHT_STATEFILE_NOT_FOUND       1
@@ -55,6 +56,7 @@ class LightStateController {
         void                    printStateJsonTo(char* output);
 
     private:
+        std::map<String, LightState> lightStates;
         LightState  currentState = {0};
         LightState  defaultState = {0};
         ulong       timestamp    = 0;

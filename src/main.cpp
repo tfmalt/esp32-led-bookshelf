@@ -11,7 +11,7 @@
  *
  * Copyright (c) 2018 Thomas Malt
  */
-#define FASTLED_ALLOW_INTERRUPTS 0
+// #define FASTLED_ALLOW_INTERRUPTS 0
 
 #include <debug.h>
 #include <Arduino.h>
@@ -26,7 +26,7 @@ FASTLED_USING_NAMESPACE
 
 // Fastled definitions
 static const uint8_t GPIO_DATA         = 18;
-static const uint8_t NUM_LEDS          = 150;
+static const uint8_t NUM_LEDS          = 192;
 static const uint8_t FPS               = 60;
 static const uint8_t FASTLED_SHOW_CORE = 0;
 
@@ -99,6 +99,7 @@ void FastLEDshowTask(void *pvParameters)
 void setupFastLED()
 {
     Serial.println("Setting up LED");
+    Serial.printf("  - number of leds: %i\n", NUM_LEDS);
     lightState.initialize();
     LightState&  currentState    = lightState.getCurrentState();
 
