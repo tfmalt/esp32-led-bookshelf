@@ -190,7 +190,7 @@ void Effects::cmdFadeTowardColor()
     fadeTowardColor(leds, numberOfLeds, targetColor, 12);
 }
 
-void Effects::setLeds(CRGB *l, const uint8_t &n)
+void Effects::setLeds(CRGB *l, const uint16_t &n)
 {
     numberOfLeds = n;
     leds = l;
@@ -198,7 +198,7 @@ void Effects::setLeds(CRGB *l, const uint8_t &n)
 
 void Effects::effectRainbow()
 {
-    fill_rainbow( leds, numberOfLeds, startHue, 5);
+    fill_rainbow( leds, numberOfLeds, startHue, 3);
 }
 
 void Effects::addGlitter(fract8 chanceOfGlitter)

@@ -21,12 +21,15 @@
 #include <LedshelfConfig.h>
 #include <LightStateController.h>
 #include <Effects.h>
+#include <string>
 
 FASTLED_USING_NAMESPACE
 
+const std::string VERSION = "v0.1.17";
+
 // Fastled definitions
 static const uint8_t GPIO_DATA         = 18;
-static const uint8_t NUM_LEDS          = 192;
+static const uint16_t NUM_LEDS         = 256;
 static const uint8_t FPS               = 60;
 static const uint8_t FASTLED_SHOW_CORE = 0;
 
@@ -128,7 +131,7 @@ void setupFastLED()
 void setup()
 {
     Serial.begin(115200);
-    Serial.printf("Starting...\n");
+    Serial.printf("Starting version %s...\n", VERSION.c_str());
 
     config.setup();
     wifiCtrl.setup(&config);

@@ -14,7 +14,7 @@ class Effects {
         CRGB                    *leds;
 
         uint8_t                 FPS                 = 0;
-        uint8_t                 numberOfLeds        = 0;
+        uint16_t                numberOfLeds        = 0;
         uint8_t                 startHue            = 0;
         uint16_t                commandFrameCount   = 0;
         uint16_t                commandFrames       = 0;
@@ -65,7 +65,7 @@ class Effects {
         void setFPS(uint8_t f);
         void setLightStateController(LightStateController *l);
         void setCommandFrames(uint16_t i);
-        void setLeds(CRGB *l, const uint8_t &n);
+        void setLeds(CRGB *l, const uint16_t &n);
         Effect getCurrentEffect();
         void setStartHue(float hue);
 };
