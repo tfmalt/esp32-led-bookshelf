@@ -147,7 +147,7 @@ void setup()
 
     // all examples I've seen has a startup grace delay.
     // Just cargo-cult copying that practise.
-    delay(2000);
+    delay(3000);
     setupFastLED();
 }
 
