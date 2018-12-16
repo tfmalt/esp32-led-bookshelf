@@ -28,7 +28,10 @@ void LedshelfConfig::parseConfigFile()
         Serial.println("  - failed to open file for reading");
         return;
     }
-    const size_t bufferSize = JSON_OBJECT_SIZE(10) + 300;
+
+    const size_t bufferSize = JSON_OBJECT_SIZE(14) + 300;
+
+    Serial.printf("  - Buffersize: %i\n", bufferSize);
 
     StaticJsonBuffer<bufferSize> configBuffer;
     JsonObject& root = configBuffer.parseObject(file);
@@ -38,16 +41,18 @@ void LedshelfConfig::parseConfigFile()
         return;
     }
 
-    wifi_ssid          = root["ssid"].as<char*>();
-    wifi_psk           = root["psk"].as<char*>();
-    mqtt_server        = root["server"].as<char*>();
-    mqtt_port          = root["port"].as<uint16_t>();
-    mqtt_username      = root["username"].as<char*>();
-    mqtt_password      = root["password"].as<char*>();
-    mqtt_client        = root["client"].as<char*>();
-    mqtt_command_topic = root["command_topic"].as<char*>();
-    mqtt_state_topic   = root["state_topic"].as<char*>();
-    mqtt_status_topic  = root["status_topic"].as<char*>();
+    wifi_ssid               = root["ssid"].as<char*>();
+    wifi_psk                = root["psk"].as<char*>();
+    mqtt_server             = root["server"].as<char*>();
+    mqtt_port               = root["port"].as<uint16_t>();
+    mqtt_username           = root["username"].as<char*>();
+    mqtt_password           = root["password"].as<char*>();
+    mqtt_client             = root["client"].as<char*>();
+    mqtt_command_topic      = root["command_topic"].as<char*>();
+    mqtt_state_topic        = root["state_topic"].as<char*>();
+    mqtt_status_topic       = root["status_topic"].as<char*>();
+    mqtt_query_topic        = root["query_topic"].as<char*>();
+    mqtt_information_topic  = root["information_topic"].as<char*>();
 
     file.close();
 }
