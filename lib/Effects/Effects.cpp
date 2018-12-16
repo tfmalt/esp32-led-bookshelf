@@ -198,7 +198,7 @@ void Effects::setLeds(CRGB *l, const uint16_t &n)
 
 void Effects::effectRainbow()
 {
-    fill_rainbow( leds, numberOfLeds, startHue, 3);
+    fill_rainbow(leds, numberOfLeds, startHue, 2);
 }
 
 void Effects::addGlitter(fract8 chanceOfGlitter)
