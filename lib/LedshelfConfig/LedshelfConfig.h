@@ -39,6 +39,12 @@ class LedshelfConfig {
         const String   &password;
         const String   &client;
 
+        String stateTopic();
+        String commandTopic();
+        String statusTopic();
+        String queryTopic();
+        String informationTopic();
+
     private:
         const String configFile = "/config.json";
         const String caFile     = "/ca.pem";

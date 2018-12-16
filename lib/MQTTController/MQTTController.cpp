@@ -46,7 +46,7 @@ void MQTTController::publishState()
 {
     char json[256];
     lightState->printStateJsonTo(json);
-    client.publish(config->state_topic.c_str(), json, true);
+    client.publish(config->stateTopic().c_str(), json, true);
 }
 
 /**
@@ -56,14 +56,15 @@ void MQTTController::publishState()
  */
 void MQTTController::callback (char* p_topic, byte* p_message, unsigned int p_length)
 {
-    if (!config->command_topic.equals(p_topic)) {
-        Serial.printf("- ERROR: Not a valid topic: '%s'. IGNORING\n", p_topic);
+    if (config->commandTopic().equals(p_topic)) {
+        // LightState& newState = lightState->parseNewState(p_message);
+        handleNewState(lightState->parseNewState(p_message));
+        publishState();
         return;
     }
 
-    // LightState& newState = lightState->parseNewState(p_message);
-    handleNewState(lightState->parseNewState(p_message));
-    publishState();
+    Serial.printf("- ERROR: Not a valid topic: '%s'. IGNORING\n", p_topic);
+    return;
 }
 // End of MQTT Callback
 
@@ -83,7 +84,8 @@ void MQTTController::handleNewState(LightState& state) {
         Serial.printf("- Got new brightness: '%i'\n", state.brightness);
         effects->setCurrentCommand(Effects::Command::Brightness);
     }
-    else if(state.status.hasColor) {
+
+    if(state.status.hasColor) {
         Serial.println("  - Got color");
         if (effects->getCurrentEffect() == Effects::Effect::NullEffect) {
             effects->setCurrentCommand(Effects::Command::Color);
@@ -186,14 +188,14 @@ void MQTTController::connect()
             config->client.c_str(),
             config->username.c_str(),
             config->password.c_str(),
-            config->status_topic.c_str(),
+            config->statusTopic().c_str(),
             0, true, "Disconnected")
         ) {
             Serial.println(" connected");
-            Serial.printf("  - status:  '%s'\n", config->status_topic.c_str());
-            Serial.printf("  - command: '%s'\n", config->command_topic.c_str());
-            client.publish(config->status_topic.c_str(), "Online", true);
-            client.subscribe(config->command_topic.c_str());
+            Serial.printf("  - status:  '%s'\n", config->statusTopic().c_str());
+            Serial.printf("  - command: '%s'\n", config->commandTopic().c_str());
+            client.publish(config->statusTopic().c_str(), "Online", true);
+            client.subscribe(config->commandTopic().c_str());
         }
         else {
             Serial.print(" failed: ");

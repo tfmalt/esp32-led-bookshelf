@@ -78,3 +78,27 @@ void LedshelfConfig::readCAFile()
 
     file.close();
 }
+
+String LedshelfConfig::stateTopic()
+{
+    return String("/" + username + state_topic);
+}
+
+String LedshelfConfig::commandTopic()
+{
+    return String("/" + username + command_topic);
+}
+
+String LedshelfConfig::statusTopic() {
+    return String("/" + username + status_topic);
+}
+
+String LedshelfConfig::queryTopic()
+{
+    return String("/" + username + query_topic);
+}
+
+String LedshelfConfig::informationTopic()
+{
+    return String("/" + username + query_topic);
+}
