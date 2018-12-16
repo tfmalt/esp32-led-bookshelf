@@ -49,6 +49,11 @@ void MQTTController::publishState()
     client.publish(config->stateTopic().c_str(), json, true);
 }
 
+void MQTTController::publishInformation(const char* message)
+{
+    client.publish(config->informationTopic().c_str(), message, false);
+}
+
 /**
  * Callback when we recive MQTT messages on topics we listen to.
  *
@@ -56,11 +61,16 @@ void MQTTController::publishState()
  */
 void MQTTController::callback (char* p_topic, byte* p_message, unsigned int p_length)
 {
+    Serial.printf("- MQTT Got topic: '%s'\n", p_topic);
     if (config->commandTopic().equals(p_topic)) {
         // LightState& newState = lightState->parseNewState(p_message);
         handleNewState(lightState->parseNewState(p_message));
         publishState();
         return;
+    }
+
+    if (config->updateTopic().equals(p_topic)) {
+        handleUpdate();
     }
 
     Serial.printf("- ERROR: Not a valid topic: '%s'. IGNORING\n", p_topic);
@@ -84,8 +94,7 @@ void MQTTController::handleNewState(LightState& state) {
         Serial.printf("- Got new brightness: '%i'\n", state.brightness);
         effects->setCurrentCommand(Effects::Command::Brightness);
     }
-
-    if(state.status.hasColor) {
+    else if(state.status.hasColor) {
         Serial.println("  - Got color");
         if (effects->getCurrentEffect() == Effects::Effect::NullEffect) {
             effects->setCurrentCommand(Effects::Command::Color);
@@ -170,6 +179,14 @@ void MQTTController::handleNewState(LightState& state) {
     }
 }
 
+void MQTTController::handleUpdate()
+{
+    client.publish(
+        config->informationTopic().c_str(),
+        "Getting ready to perform firmware update.",
+        false
+    );
+}
 void MQTTController::connect()
 {
     IPAddress mqttip;
@@ -194,8 +211,11 @@ void MQTTController::connect()
             Serial.println(" connected");
             Serial.printf("  - status:  '%s'\n", config->statusTopic().c_str());
             Serial.printf("  - command: '%s'\n", config->commandTopic().c_str());
+            Serial.printf("  - update: '%s'\n", config->updateTopic().c_str());
             client.publish(config->statusTopic().c_str(), "Online", true);
             client.subscribe(config->commandTopic().c_str());
+            client.subscribe(config->queryTopic().c_str());
+            client.subscribe(config->updateTopic().c_str());
         }
         else {
             Serial.print(" failed: ");

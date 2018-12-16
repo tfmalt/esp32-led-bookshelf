@@ -3,6 +3,7 @@
 #define MQTTController_h
 
 #include <Arduino.h>
+#include <ArduinoOTA.h>
 #include <PubSubClient.h>
 #include <WiFiClientSecure.h>
 #include <WiFiController.h>
@@ -21,6 +22,7 @@ class MQTTController {
             Effects* e
         );
         void checkConnection();
+        void publishInformation(const char* message);
     private:
         PubSubClient            client;
         WiFiController*         wifiCtrl;
@@ -30,6 +32,7 @@ class MQTTController {
 
         void publishState();
         void handleNewState(LightState& state);
+        void handleUpdate();
         void callback(char* p_topic, byte* p_message, unsigned int p_length);
         void connect();
 };
