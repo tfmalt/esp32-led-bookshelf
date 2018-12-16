@@ -25,11 +25,14 @@
 
 FASTLED_USING_NAMESPACE
 
-const std::string VERSION = "v0.1.17";
+const std::string VERSION = "v0.2.2";
 
 // Fastled definitions
 static const uint8_t GPIO_DATA         = 18;
-static const uint16_t NUM_LEDS         = 256;
+
+// 130 bed lights
+// 384 shelf lights
+static const uint16_t NUM_LEDS         = 130;
 static const uint8_t FPS               = 60;
 static const uint8_t FASTLED_SHOW_CORE = 0;
 
@@ -108,8 +111,10 @@ void setupFastLED()
 
     Serial.printf("  - state is: '%s'\n", currentState.state ? "On" : "Off");
 
-    FastLED.addLeds<WS2812B, GPIO_DATA, GRB>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
+    FastLED.addLeds<WS2812B, GPIO_DATA, GRB>(leds, NUM_LEDS).setCorrection(UncorrectedColor);
     FastLED.setBrightness(currentState.state ? currentState.brightness : 0);
+    FastLED.setMaxPowerInVoltsAndMilliamps(5, 6000);
+    set_max_power_indicator_LED(1);
 
     effects.setFPS(FPS);
     effects.setLightStateController(&lightState);
