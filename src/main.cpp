@@ -15,6 +15,7 @@
 
 #include <debug.h>
 #include <Arduino.h>
+#include <ArduinoOTA.h>
 #include <WiFiController.h>
 #include <MQTTController.h>
 #include <FastLED.h>
@@ -25,7 +26,7 @@
 
 FASTLED_USING_NAMESPACE
 
-const std::string VERSION = "v0.2.2";
+const std::string VERSION = "v0.2.5";
 
 // Fastled definitions
 static const uint8_t GPIO_DATA         = 18;
@@ -133,12 +134,50 @@ void setupFastLED()
     );
 }
 
+void setupArduinoOTA()
+{
+    // Port defaults to 3232
+    // ArduinoOTA.setPort(3232);
+
+    // Hostname defaults to esp3232-[MAC]
+    // ArduinoOTA.setHostname("myesp32");
+
+    ArduinoOTA.setPassword(config.password.c_str());
+
+    ArduinoOTA
+        .onStart([]() {
+            // U_FLASH or U_SPIFFS
+            String type = (ArduinoOTA.getCommand() == U_FLASH) ? "sketch" : "filesystem";
+            // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
+            mqttCtrl.publishInformation((String("Start updating " + type)).c_str());
+        })
+        .onEnd([]() {
+            mqttCtrl.publishInformation("Finished");
+        })
+        .onProgress([](unsigned int progress, unsigned int total) {
+            Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+        })
+      .onError([](ota_error_t error) {
+        Serial.printf("Error[%u]: ", error);
+        if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
+        else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
+        else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
+        else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
+        else if (error == OTA_END_ERROR) Serial.println("End Failed");
+      });
+
+    // ArduinoOTA.begin();
+}
+
 void setup()
 {
     Serial.begin(115200);
     Serial.printf("Starting version %s...\n", VERSION.c_str());
 
     config.setup();
+
+    setupArduinoOTA();
+
     wifiCtrl.setup(&config);
     mqttCtrl.setup(&wifiCtrl, &lightState, &config, &effects);
 
