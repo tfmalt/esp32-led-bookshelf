@@ -29,7 +29,7 @@ void LedshelfConfig::parseConfigFile()
         return;
     }
 
-    const size_t bufferSize = JSON_OBJECT_SIZE(14) + 300;
+    const size_t bufferSize = JSON_OBJECT_SIZE(15) + 300;
 
     Serial.printf("  - Buffersize: %i\n", bufferSize);
 
@@ -53,6 +53,7 @@ void LedshelfConfig::parseConfigFile()
     mqtt_status_topic       = root["status_topic"].as<char*>();
     mqtt_query_topic        = root["query_topic"].as<char*>();
     mqtt_information_topic  = root["information_topic"].as<char*>();
+    mqtt_update_topic       = root["update_topic"].as<char*>();
 
     file.close();
 }
@@ -100,5 +101,10 @@ String LedshelfConfig::queryTopic()
 
 String LedshelfConfig::informationTopic()
 {
-    return String("/" + username + query_topic);
+    return String("/" + username + information_topic);
+}
+
+String LedshelfConfig::updateTopic()
+{
+    return String("/" + username + update_topic);
 }
