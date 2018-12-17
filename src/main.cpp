@@ -26,7 +26,7 @@
 
 FASTLED_USING_NAMESPACE
 
-const std::string VERSION = "v0.2.5";
+const std::string VERSION = "v0.2.8";
 
 // Fastled definitions
 static const uint8_t GPIO_DATA         = 18;
@@ -119,6 +119,7 @@ void setupFastLED()
 
     effects.setFPS(FPS);
     effects.setLightStateController(&lightState);
+    effects.setMQTTController(&mqttCtrl);
     effects.setLeds(leds, NUM_LEDS);
     effects.setCurrentEffect(currentState.effect);
     effects.setStartHue(currentState.color.h);
@@ -155,16 +156,34 @@ void setupArduinoOTA()
             mqttCtrl.publishInformation("Finished");
         })
         .onProgress([](unsigned int progress, unsigned int total) {
-            Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+            String message = "Progress: " + String(progress) + "/" + String(total);
+            mqttCtrl.publishInformation(message.c_str());
         })
-      .onError([](ota_error_t error) {
-        Serial.printf("Error[%u]: ", error);
-        if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
-        else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
-        else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
-        else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
-        else if (error == OTA_END_ERROR) Serial.println("End Failed");
-      });
+        .onError([](ota_error_t error) {
+            Serial.printf("Error[%u]: ", error);
+            String errmsg;
+            switch (error) {
+                case OTA_AUTH_ERROR:
+                    errmsg = "Authentication failed";
+                    break;
+                case OTA_BEGIN_ERROR:
+                    errmsg = "Begin failed";
+                    break;
+                case OTA_CONNECT_ERROR:
+                    errmsg = "Connect failed";
+                    break;
+                case OTA_RECEIVE_ERROR:
+                    errmsg = "Receive failed";
+                    break;
+                case OTA_END_ERROR:
+                    errmsg = "End failed";
+                    break;
+                default:
+                    errmsg = "Unknown error";
+            }
+            String message = "Error [" + String(error) + "]: " + errmsg;
+            mqttCtrl.publishInformation(message.c_str());
+        });
 
     // ArduinoOTA.begin();
 }
@@ -175,17 +194,15 @@ void setup()
     Serial.printf("Starting version %s...\n", VERSION.c_str());
 
     config.setup();
-
-    setupArduinoOTA();
-
     wifiCtrl.setup(&config);
     mqttCtrl.setup(&wifiCtrl, &lightState, &config, &effects);
 
     wifiCtrl.connect();
 
-
+    setupArduinoOTA();
     // all examples I've seen has a startup grace delay.
     // Just cargo-cult copying that practise.
+
     delay(3000);
     setupFastLED();
 }

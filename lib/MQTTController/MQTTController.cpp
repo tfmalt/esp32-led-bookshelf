@@ -71,6 +71,7 @@ void MQTTController::callback (char* p_topic, byte* p_message, unsigned int p_le
 
     if (config->updateTopic().equals(p_topic)) {
         handleUpdate();
+        return;
     }
 
     Serial.printf("- ERROR: Not a valid topic: '%s'. IGNORING\n", p_topic);
@@ -181,12 +182,14 @@ void MQTTController::handleNewState(LightState& state) {
 
 void MQTTController::handleUpdate()
 {
-    client.publish(
-        config->informationTopic().c_str(),
-        "Getting ready to perform firmware update.",
-        false
-    );
+    publishInformation("Got update notification. Getting ready to perform firmware update.");
+    Serial.println("Running ArduinoOTA:");
+    ArduinoOTA.begin();
+    Serial.println("  - after begin.");
+
+    effects->setCurrentCommand(Effects::Command::FirmwareUpdate);
 }
+
 void MQTTController::connect()
 {
     IPAddress mqttip;

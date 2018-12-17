@@ -19,6 +19,10 @@ void Effects::setLightStateController(LightStateController *l)
     lightState = l;
 }
 
+void Effects::setMQTTController(MQTTController *m)
+{
+    mqttCtrl = m;
+}
 void Effects::setCommandFrames(uint16_t i)
 {
     commandFrames = i;
@@ -39,6 +43,9 @@ void Effects::setCurrentCommand(Command cmd)
             break;
         case Command::Color :
             currentCommand = &Effects::cmdFadeTowardColor;
+            break;
+        case Command::FirmwareUpdate :
+            currentCommand = &Effects::cmdFirmwareUpdate;
             break;
         default :
             currentCommand = &Effects::cmdEmpty;
@@ -106,6 +113,24 @@ void Effects::runCurrentEffect()
 void Effects::cmdEmpty()
 {
 
+}
+
+void Effects::cmdFirmwareUpdate()
+{
+    fill_solid(leds, numberOfLeds, CRGB::Black);
+    ArduinoOTA.handle();
+    fill_solid(leds, 15, CRGB::Green);
+    if (commandFrameCount % 60 == 0) {
+        Serial.printf("  - Running command firmware update [%i]\n", commandFrameCount);
+    }
+
+    if (commandFrameCount > 7200) {
+        Serial.println("  - no Update started rebooting.");
+        mqttCtrl.publishInformation("No update started. Restarting controller.");
+        ESP.restart();
+    }
+
+    commandFrameCount++;
 }
 
 void Effects::cmdSetBrightness()
@@ -180,7 +205,6 @@ void Effects::fadeTowardColor( CRGB* L, uint16_t N, const CRGB& bgColor, uint8_t
         setCurrentCommand(Command::None);
     }
 }
-
 
 void Effects::cmdFadeTowardColor()
 {

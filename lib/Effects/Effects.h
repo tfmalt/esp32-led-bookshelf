@@ -3,7 +3,11 @@
 
 #include <FastLED.h>
 #include <LightStateController.h>
+#include <MQTTController.h>
 #include <Arduino.h>
+#include <ArduinoOTA.h>
+
+class MQTTController;
 
 class Effects {
     private:
@@ -11,6 +15,7 @@ class Effects {
         LightCmd                currentCommand;
         LightCmd                currentEffect;
         LightStateController    *lightState;
+        MQTTController          *mqttCtrl;
         CRGB                    *leds;
 
         uint8_t                 FPS                 = 0;
@@ -23,6 +28,8 @@ class Effects {
         void cmdEmpty();
         void cmdSetBrightness();
         void cmdFadeTowardColor();
+        void cmdFirmwareUpdate();
+
         void fadeTowardColor(CRGB *L, uint16_t N, const CRGB &bgColor, uint8_t fadeAmount);
         CRGB fadeTowardColor(CRGB &cur, const CRGB &target, uint8_t amount);
         void nblendU8TowardU8(uint8_t &cur, const uint8_t target, uint8_t amount);
@@ -40,7 +47,8 @@ class Effects {
             None,
             Empty,
             Brightness,
-            Color
+            Color,
+            FirmwareUpdate
         };
         enum Effect {
             Confetti,
@@ -64,6 +72,7 @@ class Effects {
         void runCurrentEffect();
         void setFPS(uint8_t f);
         void setLightStateController(LightStateController *l);
+        void setMQTTController(MQTTController *m);
         void setCommandFrames(uint16_t i);
         void setLeds(CRGB *l, const uint16_t &n);
         Effect getCurrentEffect();
