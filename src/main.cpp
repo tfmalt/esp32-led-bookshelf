@@ -25,7 +25,7 @@
 
 FASTLED_USING_NAMESPACE
 
-const std::string VERSION = "v0.1.17";
+const std::string VERSION = "v0.1.18";
 
 // Fastled definitions
 static const uint8_t GPIO_DATA         = 18;
