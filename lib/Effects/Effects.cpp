@@ -19,10 +19,6 @@ void Effects::setLightStateController(LightStateController *l)
     lightState = l;
 }
 
-void Effects::setMQTTController(MQTTController *m)
-{
-    mqttCtrl = m;
-}
 void Effects::setCommandFrames(uint16_t i)
 {
     commandFrames = i;
@@ -126,7 +122,6 @@ void Effects::cmdFirmwareUpdate()
 
     if (commandFrameCount > 7200) {
         Serial.println("  - no Update started rebooting.");
-        mqttCtrl.publishInformation("No update started. Restarting controller.");
         ESP.restart();
     }
 

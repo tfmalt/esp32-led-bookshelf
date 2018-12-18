@@ -229,3 +229,5 @@ void MQTTController::connect()
 
     publishState();
 }
+
+// Trying to create a global object

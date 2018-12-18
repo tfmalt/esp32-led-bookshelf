@@ -3,11 +3,8 @@
 
 #include <FastLED.h>
 #include <LightStateController.h>
-#include <MQTTController.h>
 #include <Arduino.h>
 #include <ArduinoOTA.h>
-
-class MQTTController;
 
 class Effects {
     private:
@@ -15,7 +12,6 @@ class Effects {
         LightCmd                currentCommand;
         LightCmd                currentEffect;
         LightStateController    *lightState;
-        MQTTController          *mqttCtrl;
         CRGB                    *leds;
 
         uint8_t                 FPS                 = 0;
@@ -72,7 +68,6 @@ class Effects {
         void runCurrentEffect();
         void setFPS(uint8_t f);
         void setLightStateController(LightStateController *l);
-        void setMQTTController(MQTTController *m);
         void setCommandFrames(uint16_t i);
         void setLeds(CRGB *l, const uint16_t &n);
         Effect getCurrentEffect();

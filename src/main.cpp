@@ -16,12 +16,13 @@
 #include <debug.h>
 #include <Arduino.h>
 #include <ArduinoOTA.h>
+#include <WiFiClientSecure.h>
 #include <WiFiController.h>
+#include <Effects.h>
 #include <MQTTController.h>
 #include <FastLED.h>
 #include <LedshelfConfig.h>
 #include <LightStateController.h>
-#include <Effects.h>
 #include <string>
 
 FASTLED_USING_NAMESPACE
@@ -48,7 +49,7 @@ static TaskHandle_t userTaskHandle          = 0;
 LedshelfConfig        config;         // read from json config file.
 LightStateController  lightState;     // Own object. Responsible for state.
 WiFiController        wifiCtrl;
-MQTTController        mqttCtrl;
+MQTTController        mqttCtrl; // This object is created in library.
 CRGBArray<NUM_LEDS>   leds;
 Effects               effects;
 
@@ -119,7 +120,6 @@ void setupFastLED()
 
     effects.setFPS(FPS);
     effects.setLightStateController(&lightState);
-    effects.setMQTTController(&mqttCtrl);
     effects.setLeds(leds, NUM_LEDS);
     effects.setCurrentEffect(currentState.effect);
     effects.setStartHue(currentState.color.h);
