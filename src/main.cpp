@@ -12,6 +12,7 @@
  * Copyright (c) 2018 Thomas Malt
  */
 // #define FASTLED_ALLOW_INTERRUPTS 0
+// #define OTA_DEBUG Serial
 
 #include <debug.h>
 #include <Arduino.h>
@@ -23,39 +24,39 @@
 #include <FastLED.h>
 #include <LedshelfConfig.h>
 #include <LightStateController.h>
-#include <string>
 
 FASTLED_USING_NAMESPACE
 
-const std::string VERSION = "v0.2.8";
+static const String VERSION = "v0.2.14";
 
 // Fastled definitions
 static const uint8_t GPIO_DATA         = 18;
 
 // 130 bed lights
 // 384 shelf lights
-static const uint16_t NUM_LEDS         = 130;
+static const uint16_t NUM_LEDS         = 128;
 static const uint8_t FPS               = 60;
 static const uint8_t FASTLED_SHOW_CORE = 0;
 
 // Using esp32 other core to run FastLED.show().
 // -- Task handles for use in the notifications
-static TaskHandle_t FastLEDshowTaskHandle   = 0;
-static TaskHandle_t userTaskHandle          = 0;
+// static TaskHandle_t FastLEDshowTaskHandle   = 0;
+// static TaskHandle_t userTaskHandle          = 0;
 
 // A command to hold the command we're currently executing.
 
 // global objects
+CRGBArray<NUM_LEDS>   leds;
 LedshelfConfig        config;         // read from json config file.
 LightStateController  lightState;     // Own object. Responsible for state.
 WiFiController        wifiCtrl;
 MQTTController        mqttCtrl; // This object is created in library.
-CRGBArray<NUM_LEDS>   leds;
 Effects               effects;
 
 uint16_t commandFrames     = FPS;
 uint16_t commandFrameCount = 0;
 ulong    commandStart      = 0;
+uint8_t  updateProgress    = 0;
 
 /**
  * show() for ESP32
@@ -65,22 +66,22 @@ ulong    commandStart      = 0;
  *
  * Borrowed from https://github.com/FastLED/FastLED/blob/master/examples/DemoReelESP32/DemoReelESP32.ino
  */
-void fastLEDshowESP32()
-{
-    if (userTaskHandle == 0) {
-        // -- Store the handle of the current task, so that the show task can
-        //    notify it when it's done
-        userTaskHandle = xTaskGetCurrentTaskHandle();
-
-        // -- Trigger the show task
-        xTaskNotifyGive(FastLEDshowTaskHandle);
-
-        // -- Wait to be notified that it's done
-        const TickType_t xMaxBlockTime = pdMS_TO_TICKS( 200 );
-        ulTaskNotifyTake(pdTRUE, xMaxBlockTime);
-        userTaskHandle = 0;
-    }
-}
+// void fastLEDshowESP32()
+// {
+//     if (userTaskHandle == 0) {
+//         // -- Store the handle of the current task, so that the show task can
+//         //    notify it when it's done
+//         userTaskHandle = xTaskGetCurrentTaskHandle();
+//
+//         // -- Trigger the show task
+//         xTaskNotifyGive(FastLEDshowTaskHandle);
+//
+//         // -- Wait to be notified that it's done
+//         const TickType_t xMaxBlockTime = pdMS_TO_TICKS( 200 );
+//         ulTaskNotifyTake(pdTRUE, xMaxBlockTime);
+//         userTaskHandle = 0;
+//     }
+// }
 
 /**
  * show Task
@@ -88,35 +89,36 @@ void fastLEDshowESP32()
  *
  * Borrowed from https://github.com/FastLED/FastLED/blob/master/examples/DemoReelESP32/DemoReelESP32.ino
  */
-void FastLEDshowTask(void *pvParameters)
-{
-    // -- Run forever...
-    for(;;) {
-        // -- Wait for the trigger
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-
-        // -- Do the show (synchronously)
-        // Serial.printf("ESP: Running fastled.show(): %ld\n", millis());
-        FastLED.show();
-
-        // -- Notify the calling task
-        xTaskNotifyGive(userTaskHandle);
-    }
-}
+// void FastLEDshowTask(void *pvParameters)
+// {
+//     // -- Run forever...
+//     for(;;) {
+//         // -- Wait for the trigger
+//         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+//
+//         // -- Do the show (synchronously)
+//         // Serial.printf("ESP: Running fastled.show(): %ld\n", millis());
+//         FastLED.show();
+//
+//         // -- Notify the calling task
+//         xTaskNotifyGive(userTaskHandle);
+//     }
+// }
 
 void setupFastLED()
 {
     Serial.println("Setting up LED");
     Serial.printf("  - number of leds: %i\n", NUM_LEDS);
+    Serial.printf("  - maximum milliamps: %i\n", config.milliamps);
+
     lightState.initialize();
-    LightState&  currentState    = lightState.getCurrentState();
+    LightState& currentState = lightState.getCurrentState();
 
     Serial.printf("  - state is: '%s'\n", currentState.state ? "On" : "Off");
 
     FastLED.addLeds<WS2812B, GPIO_DATA, GRB>(leds, NUM_LEDS).setCorrection(UncorrectedColor);
     FastLED.setBrightness(currentState.state ? currentState.brightness : 0);
-    FastLED.setMaxPowerInVoltsAndMilliamps(5, 6000);
-    set_max_power_indicator_LED(1);
+    FastLED.setMaxPowerInVoltsAndMilliamps(5, config.milliamps);
 
     effects.setFPS(FPS);
     effects.setLightStateController(&lightState);
@@ -129,22 +131,16 @@ void setupFastLED()
     }
 
     // -- Create the FastLED show task
-    xTaskCreatePinnedToCore(
-        FastLEDshowTask, "FastLEDshowTask", 2048, NULL, 2,
-        &FastLEDshowTaskHandle, FASTLED_SHOW_CORE
-    );
+    // xTaskCreatePinnedToCore(
+    //     FastLEDshowTask, "FastLEDshowTask", 2048, NULL, 2,
+    //     &FastLEDshowTaskHandle, FASTLED_SHOW_CORE
+    // );
 }
 
 void setupArduinoOTA()
 {
-    // Port defaults to 3232
-    // ArduinoOTA.setPort(3232);
-
-    // Hostname defaults to esp3232-[MAC]
-    // ArduinoOTA.setHostname("myesp32");
-
+    ArduinoOTA.setPort(3232);
     ArduinoOTA.setPassword(config.password.c_str());
-
     ArduinoOTA
         .onStart([]() {
             // U_FLASH or U_SPIFFS
@@ -155,10 +151,11 @@ void setupArduinoOTA()
         .onEnd([]() {
             mqttCtrl.publishInformation("Finished");
         })
-        .onProgress([](unsigned int progress, unsigned int total) {
-            String message = "Progress: " + String(progress) + "/" + String(total);
-            mqttCtrl.publishInformation(message.c_str());
-        })
+        // .onProgress([](unsigned int progress, unsigned int total) {
+        //     // String message = "Progress: " + String(progress) + "/" + String(total);
+        //     // mqttCtrl.publishInformation(message.c_str());
+        //     // Serial.printf(" - Progress count: %i\n", count);
+        // })
         .onError([](ota_error_t error) {
             Serial.printf("Error[%u]: ", error);
             String errmsg;
@@ -181,11 +178,9 @@ void setupArduinoOTA()
                 default:
                     errmsg = "Unknown error";
             }
-            String message = "Error [" + String(error) + "]: " + errmsg;
+            String message = "Firmware Update Error [" + String(error) + "]: " + errmsg;
             mqttCtrl.publishInformation(message.c_str());
         });
-
-    // ArduinoOTA.begin();
 }
 
 void setup()
@@ -207,13 +202,39 @@ void setup()
     setupFastLED();
 }
 
+void publishInformationData()
+{
+    String message =
+        "{\"hostname\": \"" + String(WiFi.getHostname()) + "\", " +
+        "\"ip\": \"" + String(WiFi.localIP().toString()) + "\", " +
+        "\"version\": \"" + VERSION + "\", " +
+        "\"uptime\": " + millis() + ", " +
+        "\"memory\": " + xPortGetFreeHeapSize() +
+        "}";
+
+    mqttCtrl.publishInformation(message.c_str());
+}
+
 void loop() {
     mqttCtrl.checkConnection();
 
-    effects.runCurrentCommand();
-    effects.runCurrentEffect();
+    if (effects.currentCommandType == Effects::Command::FirmwareUpdate) {
+         ArduinoOTA.handle();
+         if (millis() > (effects.commandStart + 180000)) {
+             mqttCtrl.publishInformation("No update started for 180s. Rebooting.");
+             ESP.restart();
+         }
+    } else {
 
-    // fastLEDshowESP32();
-    FastLED.show();
-    delay(1000/FPS);
+        effects.runCurrentCommand();
+        effects.runCurrentEffect();
+
+        EVERY_N_SECONDS(60) {
+            mqttCtrl.publishStatus();
+            publishInformationData();
+        }
+        // fastLEDshowESP32();
+        FastLED.show();
+        delay(1000/FPS);
+    }
 }
