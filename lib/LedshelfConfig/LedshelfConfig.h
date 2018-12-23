@@ -15,10 +15,15 @@ class LedshelfConfig {
             state_topic(mqtt_state_topic),
             command_topic(mqtt_command_topic),
             status_topic(mqtt_status_topic),
+            query_topic(mqtt_query_topic),
+            information_topic(mqtt_information_topic),
+            update_topic(mqtt_update_topic),
             port(mqtt_port),
             username(mqtt_username),
             password(mqtt_password),
-            client(mqtt_client)
+            client(mqtt_client),
+            num_leds(mqtt_num_leds),
+            milliamps(mqtt_milliamps)
         {};
 
         void setup();
@@ -30,10 +35,22 @@ class LedshelfConfig {
         const String   &state_topic;
         const String   &command_topic;
         const String   &status_topic;
+        const String   &query_topic;
+        const String   &information_topic;
+        const String   &update_topic;
         const uint16_t &port;
         const String   &username;
         const String   &password;
         const String   &client;
+        const uint16_t &num_leds;
+        const uint16_t &milliamps;
+
+        String stateTopic();
+        String commandTopic();
+        String statusTopic();
+        String queryTopic();
+        String informationTopic();
+        String updateTopic();
 
     private:
         const String configFile = "/config.json";
@@ -50,6 +67,11 @@ class LedshelfConfig {
         String      mqtt_command_topic;
         String      mqtt_state_topic;
         String      mqtt_status_topic;
+        String      mqtt_query_topic;
+        String      mqtt_information_topic;
+        String      mqtt_update_topic;
+        uint16_t    mqtt_num_leds;
+        uint16_t    mqtt_milliamps;
 
         void parseConfigFile();
         void readCAFile();

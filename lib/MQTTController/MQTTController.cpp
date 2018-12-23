@@ -31,7 +31,7 @@ void MQTTController::checkConnection()
 {
     if (WiFi.status() != WL_CONNECTED) {
         Serial.println("Skipping MQTT because WiFI not connected.");
-        delay(500);
+        delay(5000);
         return;
     }
     if (!client.connected()) {
@@ -46,7 +46,12 @@ void MQTTController::publishState()
 {
     char json[256];
     lightState->printStateJsonTo(json);
-    client.publish(config->state_topic.c_str(), json, true);
+    client.publish(config->stateTopic().c_str(), json, true);
+}
+
+void MQTTController::publishInformation(const char* message)
+{
+    client.publish(config->informationTopic().c_str(), message, false);
 }
 
 /**
@@ -56,14 +61,26 @@ void MQTTController::publishState()
  */
 void MQTTController::callback (char* p_topic, byte* p_message, unsigned int p_length)
 {
-    if (!config->command_topic.equals(p_topic)) {
-        Serial.printf("- ERROR: Not a valid topic: '%s'. IGNORING\n", p_topic);
+    Serial.printf("- MQTT Got topic: '%s'\n", p_topic);
+    if (effects->currentCommandType == Effects::Command::FirmwareUpdate) {
+        publishInformation("Firmware update active. Ignoring command.");
         return;
     }
 
-    // LightState& newState = lightState->parseNewState(p_message);
-    handleNewState(lightState->parseNewState(p_message));
-    publishState();
+    if (config->commandTopic().equals(p_topic)) {
+        // LightState& newState = lightState->parseNewState(p_message);
+        handleNewState(lightState->parseNewState(p_message));
+        publishState();
+        return;
+    }
+
+    if (config->updateTopic().equals(p_topic)) {
+        handleUpdate();
+        return;
+    }
+
+    Serial.printf("- ERROR: Not a valid topic: '%s'. IGNORING\n", p_topic);
+    return;
 }
 // End of MQTT Callback
 
@@ -168,6 +185,18 @@ void MQTTController::handleNewState(LightState& state) {
     }
 }
 
+void MQTTController::handleUpdate()
+{
+    publishInformation("Got update notification. Getting ready to perform firmware update.");
+    Serial.println("Running ArduinoOTA");
+    ArduinoOTA.begin();
+
+    effects->setCurrentEffect(Effects::Effect::NullEffect);
+    effects->setCurrentCommand(Effects::Command::FirmwareUpdate);
+
+    effects->runCurrentCommand();
+}
+
 void MQTTController::connect()
 {
     IPAddress mqttip;
@@ -186,14 +215,18 @@ void MQTTController::connect()
             config->client.c_str(),
             config->username.c_str(),
             config->password.c_str(),
-            config->status_topic.c_str(),
+            config->statusTopic().c_str(),
             0, true, "Disconnected")
         ) {
             Serial.println(" connected");
-            Serial.printf("  - status:  '%s'\n", config->status_topic.c_str());
-            Serial.printf("  - command: '%s'\n", config->command_topic.c_str());
-            client.publish(config->status_topic.c_str(), "Online", true);
-            client.subscribe(config->command_topic.c_str());
+            Serial.printf("  - status:  '%s'\n", config->statusTopic().c_str());
+            Serial.printf("  - command: '%s'\n", config->commandTopic().c_str());
+            Serial.printf("  - update: '%s'\n", config->updateTopic().c_str());
+            //client.publish(config->statusTopic().c_str(), "Online", true);
+            publishStatus();
+            client.subscribe(config->commandTopic().c_str());
+            client.subscribe(config->queryTopic().c_str());
+            client.subscribe(config->updateTopic().c_str());
         }
         else {
             Serial.print(" failed: ");
@@ -204,3 +237,10 @@ void MQTTController::connect()
 
     publishState();
 }
+
+void MQTTController::publishStatus()
+{
+    client.publish(config->statusTopic().c_str(), "Online", true);
+}
+
+// Trying to create a global object

@@ -40,6 +40,9 @@ void Effects::setCurrentCommand(Command cmd)
         case Command::Color :
             currentCommand = &Effects::cmdFadeTowardColor;
             break;
+        case Command::FirmwareUpdate :
+            currentCommand = &Effects::cmdFirmwareUpdate;
+            break;
         default :
             currentCommand = &Effects::cmdEmpty;
             currentCommandType = Command::None;
@@ -106,6 +109,18 @@ void Effects::runCurrentEffect()
 void Effects::cmdEmpty()
 {
 
+}
+
+void Effects::cmdFirmwareUpdate()
+{
+    fill_solid(leds, numberOfLeds, CRGB::Black);
+    // fill_solid(leds, 15, CRGB::White);
+    leds[3] = CRGB::White;
+    leds[7] = CRGB::White;
+    leds[11] = CRGB::White;
+    leds[15] = CRGB::White;
+
+    FastLED.show();
 }
 
 void Effects::cmdSetBrightness()
@@ -181,7 +196,6 @@ void Effects::fadeTowardColor( CRGB* L, uint16_t N, const CRGB& bgColor, uint8_t
     }
 }
 
-
 void Effects::cmdFadeTowardColor()
 {
     LightState state = lightState->getCurrentState();
@@ -198,7 +212,7 @@ void Effects::setLeds(CRGB *l, const uint16_t &n)
 
 void Effects::effectRainbow()
 {
-    fill_rainbow( leds, numberOfLeds, startHue, 3);
+    fill_rainbow(leds, numberOfLeds, startHue, 2);
 }
 
 void Effects::addGlitter(fract8 chanceOfGlitter)

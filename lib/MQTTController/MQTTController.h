@@ -3,11 +3,12 @@
 #define MQTTController_h
 
 #include <Arduino.h>
-#include <PubSubClient.h>
+#include <ArduinoOTA.h>
+#include <LightStateController.h>
 #include <WiFiClientSecure.h>
 #include <WiFiController.h>
 #include <LedshelfConfig.h>
-#include <LightStateController.h>
+#include <PubSubClient.h>
 #include <Effects.h>
 
 class MQTTController {
@@ -18,9 +19,12 @@ class MQTTController {
             WiFiController* wc,
             LightStateController* lc,
             LedshelfConfig* c,
-            Effects* e
+            Effects *e
         );
         void checkConnection();
+        void publishInformation(const char* message);
+        void publishStatus();
+
     private:
         PubSubClient            client;
         WiFiController*         wifiCtrl;
@@ -30,6 +34,7 @@ class MQTTController {
 
         void publishState();
         void handleNewState(LightState& state);
+        void handleUpdate();
         void callback(char* p_topic, byte* p_message, unsigned int p_length);
         void connect();
 };

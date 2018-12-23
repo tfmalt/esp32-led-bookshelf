@@ -4,6 +4,7 @@
 #include <FastLED.h>
 #include <LightStateController.h>
 #include <Arduino.h>
+#include <ArduinoOTA.h>
 
 class Effects {
     private:
@@ -18,11 +19,12 @@ class Effects {
         uint8_t                 startHue            = 0;
         uint16_t                commandFrameCount   = 0;
         uint16_t                commandFrames       = 0;
-        ulong                   commandStart        = 0;
 
         void cmdEmpty();
         void cmdSetBrightness();
         void cmdFadeTowardColor();
+        void cmdFirmwareUpdate();
+
         void fadeTowardColor(CRGB *L, uint16_t N, const CRGB &bgColor, uint8_t fadeAmount);
         CRGB fadeTowardColor(CRGB &cur, const CRGB &target, uint8_t amount);
         void nblendU8TowardU8(uint8_t &cur, const uint8_t target, uint8_t amount);
@@ -40,7 +42,8 @@ class Effects {
             None,
             Empty,
             Brightness,
-            Color
+            Color,
+            FirmwareUpdate
         };
         enum Effect {
             Confetti,
@@ -55,6 +58,7 @@ class Effects {
         };
         Command  currentCommandType;
         Effect   currentEffectType;
+        ulong    commandStart = 0;
         Effects();
         void setCurrentCommand(Command cmd);
         void setCurrentEffect(String effect);
