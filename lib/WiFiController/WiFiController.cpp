@@ -22,6 +22,7 @@ void WiFiController::connect()
     Serial.printf("Connecting to: %s:\n", config->ssid.c_str());
 
     WiFi.begin(config->ssid.c_str(), config->psk.c_str());
+    WiFi.setHostname(config->username.c_str());
 
     // Wait here until we are connected.
     while (WiFi.status() != WL_CONNECTED) {
@@ -103,12 +104,12 @@ void WiFiController::handleEvent(WiFiEvent_t event)
             Serial.println(WiFi.dnsIP());
             break;
         // SYSTEM_EVENT_GOT_IP6                  < ESP32 station or ap or ethernet interface v6IP addr is preferred
-        case SYSTEM_EVENT_GOT_IP6 :
-            //both interfaces get the same event
-            Serial.printf("  - Got IPv6 address: [%i]\n", event);
-            Serial.print("    - STA IPv6: ");
-            Serial.println(WiFi.localIPv6());
-            break;
+        // case SYSTEM_EVENT_GOT_IP6 :
+        // both interfaces get the same event
+        // Serial.printf("  - Got IPv6 address: [%i]\n", event);
+        // Serial.print("    - STA IPv6: ");
+        // Serial.println(WiFi.localIPv6());
+        // break;
         default :
             Serial.printf("WIFI: Got other event: [%i]\n", event);
             break;
