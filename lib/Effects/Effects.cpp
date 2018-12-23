@@ -114,18 +114,13 @@ void Effects::cmdEmpty()
 void Effects::cmdFirmwareUpdate()
 {
     fill_solid(leds, numberOfLeds, CRGB::Black);
-    ArduinoOTA.handle();
-    fill_solid(leds, 15, CRGB::Green);
-    if (commandFrameCount % 60 == 0) {
-        Serial.printf("  - Running command firmware update [%i]\n", commandFrameCount);
-    }
+    // fill_solid(leds, 15, CRGB::White);
+    leds[3] = CRGB::White;
+    leds[7] = CRGB::White;
+    leds[11] = CRGB::White;
+    leds[15] = CRGB::White;
 
-    if (commandFrameCount > 7200) {
-        Serial.println("  - no Update started rebooting.");
-        ESP.restart();
-    }
-
-    commandFrameCount++;
+    FastLED.show();
 }
 
 void Effects::cmdSetBrightness()

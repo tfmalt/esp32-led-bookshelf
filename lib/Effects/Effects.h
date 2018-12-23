@@ -19,7 +19,6 @@ class Effects {
         uint8_t                 startHue            = 0;
         uint16_t                commandFrameCount   = 0;
         uint16_t                commandFrames       = 0;
-        ulong                   commandStart        = 0;
 
         void cmdEmpty();
         void cmdSetBrightness();
@@ -59,6 +58,7 @@ class Effects {
         };
         Command  currentCommandType;
         Effect   currentEffectType;
+        ulong    commandStart = 0;
         Effects();
         void setCurrentCommand(Command cmd);
         void setCurrentEffect(String effect);
