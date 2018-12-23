@@ -27,14 +27,14 @@
 
 FASTLED_USING_NAMESPACE
 
-static const String VERSION = "v0.2.14";
+static const String VERSION = "v0.2.15";
 
 // Fastled definitions
 static const uint8_t GPIO_DATA         = 18;
 
 // 130 bed lights
 // 384 shelf lights
-static const uint16_t NUM_LEDS         = 128;
+static const uint16_t NUM_LEDS         = 384;
 static const uint8_t FPS               = 60;
 static const uint8_t FASTLED_SHOW_CORE = 0;
 
@@ -190,7 +190,7 @@ void setup()
 
     config.setup();
     wifiCtrl.setup(&config);
-    mqttCtrl.setup(&wifiCtrl, &lightState, &config, &effects);
+    mqttCtrl.setup(VERSION, &wifiCtrl, &lightState, &config, &effects);
 
     wifiCtrl.connect();
 
@@ -200,19 +200,6 @@ void setup()
 
     delay(3000);
     setupFastLED();
-}
-
-void publishInformationData()
-{
-    String message =
-        "{\"hostname\": \"" + String(WiFi.getHostname()) + "\", " +
-        "\"ip\": \"" + String(WiFi.localIP().toString()) + "\", " +
-        "\"version\": \"" + VERSION + "\", " +
-        "\"uptime\": " + millis() + ", " +
-        "\"memory\": " + xPortGetFreeHeapSize() +
-        "}";
-
-    mqttCtrl.publishInformation(message.c_str());
 }
 
 void loop() {
@@ -231,7 +218,7 @@ void loop() {
 
         EVERY_N_SECONDS(60) {
             mqttCtrl.publishStatus();
-            publishInformationData();
+            mqttCtrl.publishInformationData();
         }
         // fastLEDshowESP32();
         FastLED.show();

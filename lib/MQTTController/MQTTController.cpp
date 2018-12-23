@@ -8,6 +8,7 @@ MQTTController::MQTTController()
 }
 
 void MQTTController::setup(
+    String v,
     WiFiController* wc,
     LightStateController* lc,
     LedshelfConfig* c,
@@ -17,6 +18,7 @@ void MQTTController::setup(
     lightState = lc;
     config     = c;
     effects    = e;
+    version    = v;
 
     Serial.printf("Setting up MQTT Client: %s %i\n", config->server.c_str(), config->port);
 
@@ -52,6 +54,19 @@ void MQTTController::publishState()
 void MQTTController::publishInformation(const char* message)
 {
     client.publish(config->informationTopic().c_str(), message, false);
+}
+
+void MQTTController::publishInformationData()
+{
+    String message =
+        "{\"hostname\": \"" + String(WiFi.getHostname()) + "\", " +
+        "\"ip\": \"" + String(WiFi.localIP().toString()) + "\", " +
+        "\"version\": \"" + version + "\", " +
+        "\"uptime\": " + millis() + ", " +
+        "\"memory\": " + xPortGetFreeHeapSize() +
+        "}";
+
+    publishInformation(message.c_str());
 }
 
 /**
@@ -222,11 +237,13 @@ void MQTTController::connect()
             Serial.printf("  - status:  '%s'\n", config->statusTopic().c_str());
             Serial.printf("  - command: '%s'\n", config->commandTopic().c_str());
             Serial.printf("  - update: '%s'\n", config->updateTopic().c_str());
-            //client.publish(config->statusTopic().c_str(), "Online", true);
-            publishStatus();
+
             client.subscribe(config->commandTopic().c_str());
             client.subscribe(config->queryTopic().c_str());
             client.subscribe(config->updateTopic().c_str());
+
+            publishStatus();
+            publishInformationData();
         }
         else {
             Serial.print(" failed: ");
