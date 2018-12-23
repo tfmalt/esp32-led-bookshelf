@@ -31,7 +31,7 @@ void MQTTController::checkConnection()
 {
     if (WiFi.status() != WL_CONNECTED) {
         Serial.println("Skipping MQTT because WiFI not connected.");
-        delay(500);
+        delay(5000);
         return;
     }
     if (!client.connected()) {
@@ -62,6 +62,11 @@ void MQTTController::publishInformation(const char* message)
 void MQTTController::callback (char* p_topic, byte* p_message, unsigned int p_length)
 {
     Serial.printf("- MQTT Got topic: '%s'\n", p_topic);
+    if (effects->currentCommandType == Effects::Command::FirmwareUpdate) {
+        publishInformation("Firmware update active. Ignoring command.");
+        return;
+    }
+
     if (config->commandTopic().equals(p_topic)) {
         // LightState& newState = lightState->parseNewState(p_message);
         handleNewState(lightState->parseNewState(p_message));
@@ -183,11 +188,13 @@ void MQTTController::handleNewState(LightState& state) {
 void MQTTController::handleUpdate()
 {
     publishInformation("Got update notification. Getting ready to perform firmware update.");
-    Serial.println("Running ArduinoOTA:");
+    Serial.println("Running ArduinoOTA");
     ArduinoOTA.begin();
-    Serial.println("  - after begin.");
 
+    effects->setCurrentEffect(Effects::Effect::NullEffect);
     effects->setCurrentCommand(Effects::Command::FirmwareUpdate);
+
+    effects->runCurrentCommand();
 }
 
 void MQTTController::connect()
@@ -215,7 +222,8 @@ void MQTTController::connect()
             Serial.printf("  - status:  '%s'\n", config->statusTopic().c_str());
             Serial.printf("  - command: '%s'\n", config->commandTopic().c_str());
             Serial.printf("  - update: '%s'\n", config->updateTopic().c_str());
-            client.publish(config->statusTopic().c_str(), "Online", true);
+            //client.publish(config->statusTopic().c_str(), "Online", true);
+            publishStatus();
             client.subscribe(config->commandTopic().c_str());
             client.subscribe(config->queryTopic().c_str());
             client.subscribe(config->updateTopic().c_str());
@@ -228,6 +236,11 @@ void MQTTController::connect()
     }
 
     publishState();
+}
+
+void MQTTController::publishStatus()
+{
+    client.publish(config->statusTopic().c_str(), "Online", true);
 }
 
 // Trying to create a global object

@@ -23,6 +23,7 @@ class MQTTController {
         );
         void checkConnection();
         void publishInformation(const char* message);
+        void publishStatus();
 
     private:
         PubSubClient            client;
