@@ -21,7 +21,9 @@ class LedshelfConfig {
             port(mqtt_port),
             username(mqtt_username),
             password(mqtt_password),
-            client(mqtt_client)
+            client(mqtt_client),
+            num_leds(mqtt_num_leds),
+            milliamps(mqtt_milliamps)
         {};
 
         void setup();
@@ -40,6 +42,8 @@ class LedshelfConfig {
         const String   &username;
         const String   &password;
         const String   &client;
+        const uint16_t &num_leds;
+        const uint16_t &milliamps;
 
         String stateTopic();
         String commandTopic();
@@ -66,6 +70,8 @@ class LedshelfConfig {
         String      mqtt_query_topic;
         String      mqtt_information_topic;
         String      mqtt_update_topic;
+        uint16_t    mqtt_num_leds;
+        uint16_t    mqtt_milliamps;
 
         void parseConfigFile();
         void readCAFile();
