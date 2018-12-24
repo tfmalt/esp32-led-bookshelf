@@ -4,11 +4,11 @@
 
 #include <Arduino.h>
 #include <ArduinoOTA.h>
-#include <LightStateController.h>
 #include <WiFiClientSecure.h>
-#include <WiFiController.h>
-#include <LedshelfConfig.h>
 #include <PubSubClient.h>
+#include <WiFiController.h>
+#include <LightStateController.h>
+#include <LedshelfConfig.h>
 #include <Effects.h>
 
 class MQTTController {
@@ -34,6 +34,7 @@ class MQTTController {
         LightStateController*   lightState;
         LedshelfConfig*         config;
         Effects*                effects;
+
 
         void publishState();
         void handleNewState(LightState& state);

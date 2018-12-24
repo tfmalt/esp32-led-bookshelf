@@ -1,10 +1,14 @@
 
 #include "MQTTController.h"
 #include <FastLED.h>
+#include <NTPClient.h>
+#include <WiFiUdp.h>
+
+WiFiUDP   ntpUDP;
+NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", 3600, 60000);
 
 MQTTController::MQTTController()
 {
-
 }
 
 void MQTTController::setup(
@@ -21,6 +25,8 @@ void MQTTController::setup(
     version    = v;
 
     Serial.printf("Setting up MQTT Client: %s %i\n", config->server.c_str(), config->port);
+
+    timeClient.begin();
 
     client.setClient(wifiCtrl->getWiFiClient());
     client.setServer(config->server.c_str(), config->port);
@@ -60,7 +66,8 @@ void MQTTController::publishInformation(const char* message)
 void MQTTController::publishInformationData()
 {
     String message =
-        "{\"hostname\": \"" + String(WiFi.getHostname()) + "\", " +
+        "{\"time\": \"" + timeClient.getFormattedTime() +"\", " +
+        "\"hostname\": \"" + String(WiFi.getHostname()) + "\", " +
         "\"ip\": \"" + String(WiFi.localIP().toString()) + "\", " +
         "\"version\": \"" + version + "\", " +
         "\"uptime\": " + millis() + ", " +
@@ -238,6 +245,8 @@ void MQTTController::connect()
             Serial.printf("  - status:  '%s'\n", config->statusTopic().c_str());
             Serial.printf("  - command: '%s'\n", config->commandTopic().c_str());
             Serial.printf("  - update: '%s'\n", config->updateTopic().c_str());
+
+            timeClient.update();
 
             client.subscribe(config->commandTopic().c_str());
             client.subscribe(config->queryTopic().c_str());

@@ -11,17 +11,15 @@
  *
  * Copyright (c) 2018 Thomas Malt
  */
-// #define FASTLED_ALLOW_INTERRUPTS 0
-// #define OTA_DEBUG Serial
 
 #include <debug.h>
 #include <Arduino.h>
 #include <ArduinoOTA.h>
 #include <WiFiClientSecure.h>
 #include <WiFiController.h>
+#include <FastLED.h>
 #include <Effects.h>
 #include <MQTTController.h>
-#include <FastLED.h>
 #include <LedshelfConfig.h>
 #include <LightStateController.h>
 
@@ -34,7 +32,7 @@ static const uint8_t GPIO_DATA         = 18;
 
 // 130 bed lights
 // 384 shelf lights
-static const uint16_t NUM_LEDS         = 130;
+static const uint16_t NUM_LEDS         = 256;
 static const uint8_t FPS               = 60;
 static const uint8_t FASTLED_SHOW_CORE = 0;
 
@@ -151,11 +149,6 @@ void setupArduinoOTA()
         .onEnd([]() {
             mqttCtrl.publishInformation("Finished");
         })
-        // .onProgress([](unsigned int progress, unsigned int total) {
-        //     // String message = "Progress: " + String(progress) + "/" + String(total);
-        //     // mqttCtrl.publishInformation(message.c_str());
-        //     // Serial.printf(" - Progress count: %i\n", count);
-        // })
         .onError([](ota_error_t error) {
             Serial.printf("Error[%u]: ", error);
             String errmsg;
@@ -195,6 +188,7 @@ void setup()
     wifiCtrl.connect();
 
     setupArduinoOTA();
+
 
     delay(3000);
     setupFastLED();
