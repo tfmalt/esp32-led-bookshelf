@@ -80,7 +80,6 @@ void WiFiController::handleEvent(WiFiEvent_t event)
             break;
         // SYSTEM_EVENT_STA_CONNECTED            < ESP32 station connected to AP
         case SYSTEM_EVENT_STA_CONNECTED :
-            WiFi.enableIpV6();
             Serial.printf("  - Connected to access point [%s][%i]\n", config->ssid.c_str(), event);
             break;
         // SYSTEM_EVENT_STA_DISCONNECTED         < ESP32 station disconnected from AP
@@ -103,13 +102,6 @@ void WiFiController::handleEvent(WiFiEvent_t event)
             Serial.print("    - DNS: ");
             Serial.println(WiFi.dnsIP());
             break;
-        // SYSTEM_EVENT_GOT_IP6                  < ESP32 station or ap or ethernet interface v6IP addr is preferred
-        // case SYSTEM_EVENT_GOT_IP6 :
-        // both interfaces get the same event
-        // Serial.printf("  - Got IPv6 address: [%i]\n", event);
-        // Serial.print("    - STA IPv6: ");
-        // Serial.println(WiFi.localIPv6());
-        // break;
         default :
             Serial.printf("WIFI: Got other event: [%i]\n", event);
             break;

@@ -27,14 +27,14 @@
 
 FASTLED_USING_NAMESPACE
 
-static const String VERSION = "v0.3.1";
+static const String VERSION = "v0.3.2";
 
 // Fastled definitions
 static const uint8_t GPIO_DATA         = 18;
 
 // 130 bed lights
 // 384 shelf lights
-static const uint16_t NUM_LEDS         = 384;
+static const uint16_t NUM_LEDS         = 130;
 static const uint8_t FPS               = 60;
 static const uint8_t FASTLED_SHOW_CORE = 0;
 
@@ -117,8 +117,8 @@ void setupFastLED()
     Serial.printf("  - state is: '%s'\n", currentState.state ? "On" : "Off");
 
     FastLED.addLeds<WS2812B, GPIO_DATA, GRB>(leds, NUM_LEDS).setCorrection(UncorrectedColor);
-    FastLED.setBrightness(currentState.state ? currentState.brightness : 0);
     FastLED.setMaxPowerInVoltsAndMilliamps(5, config.milliamps);
+    FastLED.setBrightness(currentState.state ? currentState.brightness : 0);
 
     effects.setFPS(FPS);
     effects.setLightStateController(&lightState);
@@ -126,9 +126,9 @@ void setupFastLED()
     effects.setCurrentEffect(currentState.effect);
     effects.setStartHue(currentState.color.h);
 
-    if (currentState.effect == "") {
-        effects.setCurrentCommand(Effects::Command::Color);
-    }
+    // if (currentState.effect == "") {
+    //     effects.setCurrentCommand(Effects::Command::Color);
+    // }
 
     // -- Create the FastLED show task
     // xTaskCreatePinnedToCore(
@@ -190,29 +190,14 @@ void setup()
 
     config.setup();
     wifiCtrl.setup(&config);
-    mqttCtrl.setup(&wifiCtrl, &lightState, &config, &effects);
+    mqttCtrl.setup(VERSION, &wifiCtrl, &lightState, &config, &effects);
 
     wifiCtrl.connect();
 
     setupArduinoOTA();
-    // all examples I've seen has a startup grace delay.
-    // Just cargo-cult copying that practise.
 
     delay(3000);
     setupFastLED();
-}
-
-void publishInformationData()
-{
-    String message =
-        "{\"hostname\": \"" + String(WiFi.getHostname()) + "\", " +
-        "\"ip\": \"" + String(WiFi.localIP().toString()) + "\", " +
-        "\"version\": \"" + VERSION + "\", " +
-        "\"uptime\": " + millis() + ", " +
-        "\"memory\": " + xPortGetFreeHeapSize() +
-        "}";
-
-    mqttCtrl.publishInformation(message.c_str());
 }
 
 void loop() {
@@ -231,7 +216,7 @@ void loop() {
 
         EVERY_N_SECONDS(60) {
             mqttCtrl.publishStatus();
-            publishInformationData();
+            mqttCtrl.publishInformationData();
         }
         // fastLEDshowESP32();
         FastLED.show();

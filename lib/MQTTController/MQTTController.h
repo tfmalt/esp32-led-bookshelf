@@ -16,6 +16,7 @@ class MQTTController {
         MQTTController();
 
         void setup(
+            String v,
             WiFiController* wc,
             LightStateController* lc,
             LedshelfConfig* c,
@@ -23,9 +24,11 @@ class MQTTController {
         );
         void checkConnection();
         void publishInformation(const char* message);
+        void publishInformationData();
         void publishStatus();
 
     private:
+        String                  version;
         PubSubClient            client;
         WiFiController*         wifiCtrl;
         LightStateController*   lightState;
