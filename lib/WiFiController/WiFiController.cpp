@@ -85,10 +85,10 @@ void WiFiController::handleEvent(WiFiEvent_t event)
         // SYSTEM_EVENT_STA_DISCONNECTED         < ESP32 station disconnected from AP
         case SYSTEM_EVENT_STA_DISCONNECTED :
             Serial.printf("WIFI: got SYSTEM_EVENT_STA_DISCONNECTED [%i]\n", event);
-            Serial.println("  - reconnecting...");
+            Serial.println("  - restarting...");
             // sleeping for half a second to let things settle
             delay(500);
-            connect();
+            ESP.restart();
             break;
         // SYSTEM_EVENT_STA_AUTHMODE_CHANGE      < the auth mode of AP connected by ESP32 station changed
         case SYSTEM_EVENT_STA_AUTHMODE_CHANGE :

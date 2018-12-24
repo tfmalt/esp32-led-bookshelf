@@ -25,14 +25,14 @@
 
 FASTLED_USING_NAMESPACE
 
-static const String VERSION = "v0.3.2";
+static const String VERSION = "v0.3.3";
 
 // Fastled definitions
 static const uint8_t GPIO_DATA         = 18;
 
 // 130 bed lights
 // 384 shelf lights
-static const uint16_t NUM_LEDS         = 256;
+static const uint16_t NUM_LEDS         = 130;
 static const uint8_t FPS               = 60;
 static const uint8_t FASTLED_SHOW_CORE = 0;
 
