@@ -32,8 +32,9 @@ void MQTTController::setup(
 void MQTTController::checkConnection()
 {
     if (WiFi.status() != WL_CONNECTED) {
-        Serial.println("Skipping MQTT because WiFI not connected.");
-        delay(5000);
+        Serial.println("Restarting because WiFI not connected.");
+        //delay(5000);
+        ESP.restart();
         return;
     }
     if (!client.connected()) {
