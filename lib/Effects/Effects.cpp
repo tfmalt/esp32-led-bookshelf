@@ -1,5 +1,6 @@
 
 #include "Effects.h"
+// #include <FastLED.h>
 
 Effects::Effects() {
     currentCommand = &Effects::cmdEmpty;
@@ -58,6 +59,7 @@ Effects::Effect Effects::getEffectFromString(String str)
 {
     if (str == "Glitter Rainbow")   return Effect::GlitterRainbow;
     if (str == "Rainbow")           return Effect::Rainbow;
+    if (str == "RainbowByShelf")    return Effect::RainbowByShelf;
     if (str == "BPM")               return Effect::BPM;
     if (str == "Confetti")          return Effect::Confetti;
     if (str == "Juggle")            return Effect::Juggle;
@@ -77,6 +79,9 @@ void Effects::setCurrentEffect(Effect effect)
             break;
         case Effect::Rainbow :
             currentEffect = &Effects::effectRainbow;
+            break;
+        case Effect::RainbowByShelf :
+            currentEffect = &Effects::effectRainbowByShelf;
             break;
         case Effect::BPM :
             currentEffect = &Effects::effectBPM;
@@ -113,7 +118,7 @@ void Effects::cmdEmpty()
 
 void Effects::cmdFirmwareUpdate()
 {
-    fill_solid(leds, numberOfLeds, CRGB::Black);
+    fill_solid(leds, 15, CRGB::Black);
     // fill_solid(leds, 15, CRGB::White);
     leds[3] = CRGB::White;
     leds[7] = CRGB::White;
@@ -204,7 +209,7 @@ void Effects::cmdFadeTowardColor()
     fadeTowardColor(leds, numberOfLeds, targetColor, 12);
 }
 
-void Effects::setLeds(CRGB *l, const uint16_t &n)
+void Effects::setLeds(CRGB* l, const uint16_t &n)
 {
     numberOfLeds = n;
     leds = l;
@@ -213,6 +218,23 @@ void Effects::setLeds(CRGB *l, const uint16_t &n)
 void Effects::effectRainbow()
 {
     fill_rainbow(leds, numberOfLeds, startHue, 2);
+}
+
+void Effects::effectRainbowByShelf()
+{
+    CRGBSet ledset(leds, numberOfLeds);
+    ledset(0, 63).fill_rainbow(startHue, 4);
+    ledset(64, 127) = ledset(63, 0);
+
+    if (numberOfLeds < 131) return;
+
+    ledset(128, 191).fill_rainbow(startHue+64, 4);
+    ledset(192, 255) = ledset(191,128);
+
+    if (numberOfLeds < 257) return;
+
+    ledset(256, 319).fill_rainbow(startHue+128, 4);
+    ledset(320, 383) = ledset(319, 256);
 }
 
 void Effects::addGlitter(fract8 chanceOfGlitter)

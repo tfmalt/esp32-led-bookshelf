@@ -11,8 +11,8 @@ class Effects {
         typedef void            (Effects::*LightCmd)();
         LightCmd                currentCommand;
         LightCmd                currentEffect;
-        LightStateController    *lightState;
-        CRGB                    *leds;
+        LightStateController*   lightState;
+        CRGB*                   leds;
 
         uint8_t                 FPS                 = 0;
         uint16_t                numberOfLeds        = 0;
@@ -31,6 +31,7 @@ class Effects {
         void addGlitter(fract8 chanceOfGlitter);
         void effectGlitterRainbow();
         void effectRainbow();
+        void effectRainbowByShelf();
         void effectBPM();
         void effectConfetti();
         void effectSinelon();
@@ -50,6 +51,7 @@ class Effects {
             BPM,
             GlitterRainbow,
             Rainbow,
+            RainbowByShelf,
             Juggle,
             Sinelon,
             NullEffect,
@@ -69,7 +71,7 @@ class Effects {
         void setFPS(uint8_t f);
         void setLightStateController(LightStateController *l);
         void setCommandFrames(uint16_t i);
-        void setLeds(CRGB *l, const uint16_t &n);
+        void setLeds(CRGB* l, const uint16_t &n);
         Effect getCurrentEffect();
         void setStartHue(float hue);
 };
