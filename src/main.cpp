@@ -12,36 +12,32 @@
  * Copyright (c) 2018 Thomas Malt
  */
 
-#include <debug.h>
+#define DEBUG 1
+
 #include <Arduino.h>
 #include <ArduinoOTA.h>
 #include <WiFiClientSecure.h>
 #include <WiFiController.h>
 #include <FastLED.h>
+#include <NTPClient.h>
 #include <Effects.h>
 #include <MQTTController.h>
 #include <LedshelfConfig.h>
 #include <LightStateController.h>
+#include <Light.h>
 
 FASTLED_USING_NAMESPACE
 
-static const String VERSION = "v0.3.5";
+static const String VERSION = "v0.3.6";
 
 // Fastled definitions
 static const uint8_t GPIO_DATA         = 18;
 
 // 130 bed lights
 // 384 shelf lights
-static const uint16_t NUM_LEDS         = 256;
+static const uint16_t NUM_LEDS         = 130;
 static const uint8_t FPS               = 60;
 static const uint8_t FASTLED_SHOW_CORE = 0;
-
-// Using esp32 other core to run FastLED.show().
-// -- Task handles for use in the notifications
-// static TaskHandle_t FastLEDshowTaskHandle   = 0;
-// static TaskHandle_t userTaskHandle          = 0;
-
-// A command to hold the command we're currently executing.
 
 // global objects
 CRGBArray<NUM_LEDS>   leds;
@@ -50,58 +46,28 @@ LightStateController  lightState;     // Own object. Responsible for state.
 WiFiController        wifiCtrl;
 MQTTController        mqttCtrl; // This object is created in library.
 Effects               effects;
+Light                 topLeft;
+WiFiUDP               ntpUDP;
+NTPClient             timeClient(ntpUDP, "europe.pool.ntp.org", 3600, 60000);
 
 uint16_t commandFrames     = FPS;
 uint16_t commandFrameCount = 0;
 ulong    commandStart      = 0;
 uint8_t  updateProgress    = 0;
 
-/**
- * show() for ESP32
- *
- * Call this function instead of FastLED.show(). It signals core 0 to issue a show,
- * then waits for a notification that it is done.
- *
- * Borrowed from https://github.com/FastLED/FastLED/blob/master/examples/DemoReelESP32/DemoReelESP32.ino
- */
-// void fastLEDshowESP32()
-// {
-//     if (userTaskHandle == 0) {
-//         // -- Store the handle of the current task, so that the show task can
-//         //    notify it when it's done
-//         userTaskHandle = xTaskGetCurrentTaskHandle();
-//
-//         // -- Trigger the show task
-//         xTaskNotifyGive(FastLEDshowTaskHandle);
-//
-//         // -- Wait to be notified that it's done
-//         const TickType_t xMaxBlockTime = pdMS_TO_TICKS( 200 );
-//         ulTaskNotifyTake(pdTRUE, xMaxBlockTime);
-//         userTaskHandle = 0;
-//     }
-// }
+void publishInformationData()
+{
+    String message =
+        "{\"time\": \"" + timeClient.getFormattedTime() +"\", " +
+        "\"hostname\": \"" + String(WiFi.getHostname()) + "\", " +
+        "\"ip\": \"" + String(WiFi.localIP().toString()) + "\", " +
+        "\"version\": \"" + VERSION + "\", " +
+        "\"uptime\": " + millis() + ", " +
+        "\"memory\": " + xPortGetFreeHeapSize() +
+        "}";
 
-/**
- * show Task
- * This function runs on core 0 and just waits for requests to call FastLED.show()
- *
- * Borrowed from https://github.com/FastLED/FastLED/blob/master/examples/DemoReelESP32/DemoReelESP32.ino
- */
-// void FastLEDshowTask(void *pvParameters)
-// {
-//     // -- Run forever...
-//     for(;;) {
-//         // -- Wait for the trigger
-//         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-//
-//         // -- Do the show (synchronously)
-//         // Serial.printf("ESP: Running fastled.show(): %ld\n", millis());
-//         FastLED.show();
-//
-//         // -- Notify the calling task
-//         xTaskNotifyGive(userTaskHandle);
-//     }
-// }
+    mqttCtrl.publishInformation(message.c_str());
+}
 
 void setupFastLED()
 {
@@ -118,25 +84,24 @@ void setupFastLED()
     FastLED.setMaxPowerInVoltsAndMilliamps(5, config.milliamps);
     FastLED.setBrightness(currentState.state ? currentState.brightness : 0);
 
+    topLeft.addLeds(leds);
+    topLeft.addSegment(Light::Segment::Top, 0, 15);
+
     effects.setFPS(FPS);
     effects.setLightStateController(&lightState);
     effects.setLeds(leds, NUM_LEDS);
     effects.setCurrentEffect(currentState.effect);
     effects.setStartHue(currentState.color.h);
 
-    // if (currentState.effect == "") {
-    //     effects.setCurrentCommand(Effects::Command::Color);
-    // }
-
-    // -- Create the FastLED show task
-    // xTaskCreatePinnedToCore(
-    //     FastLEDshowTask, "FastLEDshowTask", 2048, NULL, 2,
-    //     &FastLEDshowTaskHandle, FASTLED_SHOW_CORE
-    // );
+    mqttCtrl.publishStatus();
+    mqttCtrl.publishState(lightState);
+    publishInformationData();
 }
 
 void setupArduinoOTA()
 {
+    Serial.println("Setting up ArduinoOTA.");
+
     ArduinoOTA.setPort(3232);
     ArduinoOTA.setPassword(config.password.c_str());
     ArduinoOTA
@@ -144,10 +109,10 @@ void setupArduinoOTA()
             // U_FLASH or U_SPIFFS
             String type = (ArduinoOTA.getCommand() == U_FLASH) ? "sketch" : "filesystem";
             // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
-            mqttCtrl.publishInformation((String("Start updating " + type)).c_str());
+            mqttCtrl.publishInformation((String("ArduinioOTA started updating " + type)).c_str());
         })
         .onEnd([]() {
-            mqttCtrl.publishInformation("Finished");
+            mqttCtrl.publishInformation("ArduinoOTA Finished updating");
         })
         .onError([](ota_error_t error) {
             Serial.printf("Error[%u]: ", error);
@@ -171,9 +136,117 @@ void setupArduinoOTA()
                 default:
                     errmsg = "Unknown error";
             }
-            String message = "Firmware Update Error [" + String(error) + "]: " + errmsg;
+            String message = "ArduinoOTA Firmware Update Error [" + String(error) + "]: " + errmsg;
             mqttCtrl.publishInformation(message.c_str());
         });
+}
+
+/**
+ * Looks over the new state and dispatches updates to effects and issues
+ * commands.
+ */
+void handleNewState(LightState& state) {
+    if (state.state == false) {
+        FastLED.setBrightness(0);
+        return;
+    }
+
+    if(state.status.hasBrightness)
+    {
+        Serial.printf("- Got new brightness: '%i'\n", state.brightness);
+        effects.setCurrentCommand(Effects::Command::Brightness);
+    }
+    else if(state.status.hasColor) {
+        Serial.println("  - Got color");
+        if (effects.getCurrentEffect() == Effects::Effect::NullEffect) {
+            effects.setCurrentCommand(Effects::Command::Color);
+        }
+        else {
+            effects.setStartHue(state.color.h);
+        }
+    }
+    else if (state.status.hasEffect) {
+        Serial.printf("  - Got effect '%s'. Setting it.\n", state.effect.c_str());
+        effects.setCurrentEffect(state.effect);
+        if (state.effect == "") {
+            effects.setCurrentCommand(Effects::Command::Color);
+        }
+    }
+    else if (state.status.hasColorTemp) {
+        unsigned int kelvin = (1000000/state.color_temp);
+        Serial.printf("  - Got color temp: %i mired = %i Kelvin\n", state.color_temp, kelvin);
+
+        unsigned int temp = kelvin / 100;
+
+        double red = 0;
+        if (temp <= 66) {
+            red = 255;
+        }
+        else {
+            red = temp - 60;
+            red = 329.698727446 * (pow(red, -0.1332047592));
+            if (red < 0)    red = 0;
+            if (red > 255)  red = 255;
+        }
+
+        double green = 0;
+        if (temp <= 66) {
+            green = temp;
+            green = 99.4708025861 * log(green) - 161.1195681661;
+            if (green < 0)      green = 0;
+            if (green > 255)    green = 255;
+        }
+        else {
+            green = temp - 60;
+            green = 288.1221695283 * (pow(green, -0.0755148492));
+            if (green < 0)      green = 0;
+            if (green > 255)    green = 255;
+        }
+
+        double blue = 0;
+        if (temp >= 66) {
+            blue = 255;
+        }
+        else {
+            if (temp <= 19) {
+                blue = 0;
+            }
+            else {
+                blue = temp - 10;
+                blue = 138.5177312231 * log(blue) - 305.0447927307;
+                if (blue < 0)   blue = 0;
+                if (blue > 255) blue = 255;
+            }
+        }
+
+        Serial.printf(
+            "    - RGB [%i, %i, %i]",
+            static_cast<uint8_t>(red),
+            static_cast<uint8_t>(green),
+            static_cast<uint8_t>(blue)
+        );
+        state.color.r = static_cast<uint8_t>(red);
+        state.color.g = static_cast<uint8_t>(green);
+        state.color.b = static_cast<uint8_t>(blue);
+
+        effects.setCurrentCommand(Effects::Command::Color);
+    }
+    else {
+        // assuming turn on is the only thing.
+        effects.setCurrentCommand(Effects::Command::Brightness);
+    }
+}
+
+
+void handleOTAUpdate()
+{
+    mqttCtrl.publishInformation("Got update notification. Getting ready to perform firmware update.");
+    Serial.println("Running ArduinoOTA");
+    ArduinoOTA.begin();
+
+    effects.setCurrentEffect(Effects::Effect::NullEffect);
+    effects.setCurrentCommand(Effects::Command::FirmwareUpdate);
+    effects.runCurrentCommand();
 }
 
 void setup()
@@ -183,12 +256,43 @@ void setup()
 
     config.setup();
     wifiCtrl.setup(&config);
-    mqttCtrl.setup(VERSION, &wifiCtrl, &lightState, &config, &effects);
+    mqttCtrl.setup(VERSION, &wifiCtrl, &config,
+        [](char* topic, byte* message, unsigned int length){
+            Serial.printf("- MQTT Got topic: '%s'\n", topic);
+
+            if (effects.currentCommandType == Effects::Command::FirmwareUpdate) {
+                mqttCtrl.publishInformation("Firmware update active. Ignoring command.");
+                return;
+            }
+
+            if (config.commandTopic().equals(topic)) {
+                handleNewState(lightState.parseNewState(message));
+                mqttCtrl.publishState(lightState);
+                return;
+            }
+
+            if (config.updateTopic().equals(topic)) {
+                handleOTAUpdate();
+                return;
+            }
+
+            Serial.printf("- ERROR: Not a valid topic: '%s'. IGNORING\n", topic);
+            return;
+        }
+    );
 
     wifiCtrl.connect();
+    Serial.printf("Waiting for WiFi ");
+    while (WiFi.status() != WL_CONNECTED) {
+        Serial.printf(".");
+        delay(100);
+    }
+    Serial.printf("\n");
+    mqttCtrl.connect();
+    timeClient.begin();
+    timeClient.update();
 
     setupArduinoOTA();
-
 
     delay(3000);
     setupFastLED();
@@ -210,10 +314,11 @@ void loop() {
 
         EVERY_N_SECONDS(60) {
             mqttCtrl.publishStatus();
-            mqttCtrl.publishInformationData();
+            publishInformationData();
         }
         // fastLEDshowESP32();
         FastLED.show();
         delay(1000/FPS);
     }
 }
+
