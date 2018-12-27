@@ -4,6 +4,19 @@
 #ifndef LedshelfConfig_h
 #define LedshelfConfig_h
 #include <Arduino.h>
+#include <vector>
+
+typedef struct LightConfig {
+    String name;
+    uint16_t top[2];
+    uint16_t bottom[2];
+    String command_topic;
+    String state_topic;
+} LightConfig;
+
+// typedef struct Lights {
+//
+// };
 
 class LedshelfConfig {
     public:
@@ -72,6 +85,8 @@ class LedshelfConfig {
         String      mqtt_update_topic;
         uint16_t    mqtt_num_leds;
         uint16_t    mqtt_milliamps;
+
+        std::vector<LightConfig> lights;
 
         void parseConfigFile();
         void readCAFile();

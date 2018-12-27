@@ -26,10 +26,11 @@ void LedshelfConfig::parseConfigFile()
     File file = SPIFFS.open(configFile, "r");
     if(!file) {
         Serial.println("  - failed to open file for reading");
+        ESP.restart();
         return;
     }
 
-    const size_t bufferSize = JSON_OBJECT_SIZE(20) + 300;
+    const size_t bufferSize = 2700;
 
     Serial.printf("  - Buffersize: %i\n", bufferSize);
 
@@ -37,8 +38,23 @@ void LedshelfConfig::parseConfigFile()
     JsonObject& root = configBuffer.parseObject(file);
 
     if (!root.success()) {
-        Serial.println("  - parsing jsonBuffer failed");
+        Serial.println("  - ERROR: parsing jsonBuffer failed");
+        ESP.restart();
         return;
+    }
+
+    if (root.containsKey("lights")) {
+        JsonObject& lightsJson = root["lights"].as<JsonObject>();
+        for (const JsonPair item : lightsJson ) {
+            LightConfig light;
+            light.name = item.key;
+            item.value["top"].as<JsonArray>().copyTo(light.top);
+            item.value["bottom"].as<JsonArray>().copyTo(light.bottom);
+            light.command_topic = item.value["command_topic"].as<String>();
+            light.state_topic = item.value["state_topic"].as<String>();
+
+            lights.push_back(light);
+        }
     }
 
     wifi_ssid               = root["ssid"].as<char*>();
@@ -59,6 +75,8 @@ void LedshelfConfig::parseConfigFile()
 
     file.close();
 }
+
+
 
 /**
  * Reads the TLS CA Root Certificate from file.
