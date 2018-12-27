@@ -4,7 +4,6 @@
  * Copyright 2018 Thomas Malt <thomas@malt.no>
  */
 #include "LightStateController.h"
-#include <debug.h>
 #include <SPIFFS.h>
 #include <FS.h>
 #include <ArduinoJson.h>
@@ -87,43 +86,6 @@ LightState& LightStateController::parseNewState(byte* payload)
     saveCurrentState();
 
     return currentState;
-}
-
-void LightStateController::printStateDebug(LightState& state)
-{
-    #ifdef DEBUG
-    Serial.println("DEBUG: got new LightState:");
-    Serial.printf(
-        "  - has state: %s, value: %s\n",
-        (state.status.hasState ? "true" : "false"),
-        (state.state) ? "On": "Off"
-    );
-    Serial.printf(
-        "  - has brightness: %s, value: %i\n",
-        (state.status.hasBrightness ? "true" : "false"),
-        state.brightness
-    );
-    Serial.printf(
-        "  - has color_temp: %s, value: %i\n",
-        (state.status.hasColorTemp ? "true" : "false"),
-        state.color_temp
-    );
-    Serial.printf(
-        "  - has transition: %s, value: %i\n",
-        (state.status.hasTransition ? "true" : "false"),
-        state.transition
-    );
-    Serial.printf(
-        "  - has effect: %s, value: '%s'\n",
-        (state.status.hasEffect ? "true" : "false"),
-        state.effect.c_str()
-    );
-    Serial.printf("  - has color: %s, value: [%i,%i,%i,%0.2f,%0.2f]\n",
-        (state.status.hasColor ? "true" : "false"),
-        state.color.r, state.color.g, state.color.b,
-        state.color.h, state.color.s
-    );
-    #endif
 }
 
 /**
@@ -263,4 +225,41 @@ uint8_t LightStateController::saveCurrentState()
 LightState& LightStateController::getCurrentState()
 {
     return currentState;
+}
+
+void LightStateController::printStateDebug(LightState& state)
+{
+    #ifdef DEBUG
+    Serial.println("DEBUG: got new LightState:");
+    Serial.printf(
+        "  - has state: %s, value: %s\n",
+        (state.status.hasState ? "true" : "false"),
+        (state.state) ? "On": "Off"
+    );
+    Serial.printf(
+        "  - has brightness: %s, value: %i\n",
+        (state.status.hasBrightness ? "true" : "false"),
+        state.brightness
+    );
+    Serial.printf(
+        "  - has color_temp: %s, value: %i\n",
+        (state.status.hasColorTemp ? "true" : "false"),
+        state.color_temp
+    );
+    Serial.printf(
+        "  - has transition: %s, value: %i\n",
+        (state.status.hasTransition ? "true" : "false"),
+        state.transition
+    );
+    Serial.printf(
+        "  - has effect: %s, value: '%s'\n",
+        (state.status.hasEffect ? "true" : "false"),
+        state.effect.c_str()
+    );
+    Serial.printf("  - has color: %s, value: [%i,%i,%i,%0.2f,%0.2f]\n",
+        (state.status.hasColor ? "true" : "false"),
+        state.color.r, state.color.g, state.color.b,
+        state.color.h, state.color.s
+    );
+    #endif
 }
