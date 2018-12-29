@@ -8,6 +8,8 @@
 #include <FS.h>
 #include <ArduinoJson.h>
 
+#define DEBUG 1
+
 LightState::LightState()
 {
     Color defaultColor = {0};
@@ -23,25 +25,20 @@ LightState::LightState()
     defaultState.status     = defaultStatus;
 }
 
-uint8_t LightState::initialize(const char* stateFile)
+uint8_t LightState::initialize(String sf)
 {
+    stateFile = sf;
     currentState = defaultState;
-    Serial.printf("LightState: Reading in '%s'\n", stateFile);
-    File file = SPIFFS.open(stateFile, "r");
+    File file = SPIFFS.open(stateFile.c_str(), "r");
     if (!file) return LIGHT_STATEFILE_NOT_FOUND;
-
-    Serial.println("  - Opened file ok.");
 
     StaticJsonBuffer<512> buffer;
     JsonObject& root = buffer.parseObject(file);
 
     if (!root.success()) return LIGHT_STATEFILE_JSON_FAILED;
 
-    Serial.println("  - Parsed JSON ok.");
-
     currentState.state = (root["state"] == "ON") ? true : false;
 
-    // if (root.containsKey("effect"))
     currentState.effect     = root["effect"].as<String>();
     currentState.brightness = (uint8_t) root["brightness"];
     currentState.color_temp = (uint16_t) root["color_temp"];
@@ -133,6 +130,7 @@ LightStateData LightState::getLightStateFromPayload(byte* payload)
 
     newState.state = root["state"] == "ON" ? true : false;
     newState.status.hasState = true;
+    newState.status.stateHasChanged = (newState.state == currentState.state) ? false : true;
 
     if (root.containsKey("brightness")) {
         newState.status.hasBrightness = true;
@@ -204,11 +202,46 @@ JsonObject& LightState::createCurrentStateJsonObject(JsonObject& object, JsonObj
 uint8_t LightState::saveCurrentState()
 {
     StaticJsonBuffer<256> jsonBuffer;
+    Serial.printf("    - allocated jsonBuffer\n");
+
     JsonObject& object = jsonBuffer.createObject();
+
+    if (object.success()) {
+        Serial.println("    - creation of json object successfull");
+    }
+    else {
+        Serial.printf("    - creation of json object failure\n");
+        return LIGHT_STATEFILE_JSON_FAILED;
+    }
+
     JsonObject& color = jsonBuffer.createObject();
+
+    if (color.success()) {
+        Serial.println("    - creation of json color successfull");
+    }
+    else {
+        Serial.printf("    - creation of json color failure\n");
+        return LIGHT_STATEFILE_JSON_FAILED;
+    }
+
     JsonObject& current = createCurrentStateJsonObject(object, color);
 
-    File file = SPIFFS.open(stateFile, "w+");
+    if (current.success()) {
+        Serial.println("    - parsing of current object successfull");
+    }
+    else {
+        Serial.printf("    - parsing of current object failure\n");
+        return LIGHT_STATEFILE_JSON_FAILED;
+    }
+
+    Serial.printf("    - Getting ready to open: %s\n", stateFile.c_str());
+
+    File file = SPIFFS.open(stateFile.c_str(), "w");
+    if(!file) {
+        Serial.printf("    - failed to open: %s\n", stateFile.c_str());
+        return LIGHT_STATEFILE_NOT_FOUND;
+    }
+
     current.prettyPrintTo(file);
 
     file.close();
@@ -221,14 +254,15 @@ LightStateData& LightState::getCurrentState()
     return currentState;
 }
 
-void LightState::printStateDebug(LightState& state)
+void LightState::printStateDebug(LightStateData& state)
 {
     #ifdef DEBUG
     Serial.println("DEBUG: got new LightState:");
     Serial.printf(
-        "  - has state: %s, value: %s\n",
+        "  - has state: %s, value: %s, has changed: %s\n",
         (state.status.hasState ? "true" : "false"),
-        (state.state) ? "On": "Off"
+        (state.state) ? "On": "Off",
+        (state.status.stateHasChanged ? "true" : "false")
     );
     Serial.printf(
         "  - has brightness: %s, value: %i\n",
@@ -256,4 +290,15 @@ void LightState::printStateDebug(LightState& state)
         state.color.h, state.color.s
     );
     #endif
+}
+
+LightState& LightState::setColor(Color c)
+{
+    currentState.color = c;
+    return *this;
+}
+
+String LightState::getEffect()
+{
+    return currentState.effect;
 }

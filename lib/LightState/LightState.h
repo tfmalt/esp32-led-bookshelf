@@ -31,6 +31,7 @@ typedef struct LightStatus {
     bool hasEffect;
     bool hasState;
     bool success;
+    bool stateHasChanged;
     uint8_t status;
 } LightStatus;
 
@@ -48,21 +49,23 @@ typedef struct LightStateData {
 class LightState {
     public:
         LightState();
-        uint8_t         initialize(const char* stateFile);
+        uint8_t         initialize(String sf);
         LightStateData& parseNewState(byte* payload);
         LightStateData& getCurrentState();
         void            printStateJsonTo(char* output);
+        LightState&     setColor(Color c);
+        String          getEffect();
 
     private:
         LightStateData  currentState = {0};
         LightStateData  defaultState = {0};
         ulong           timestamp    = 0;
 
-        char* stateFile;  // = "/light_state.json";
+        String stateFile;  // = "/light_state.json";
 
         Color           getColorFromJsonObject(JsonObject& root);
         LightStateData  getLightStateFromPayload(byte* payload);
-        void            printStateDebug(LightState& state);
+        void            printStateDebug(LightStateData& state);
         JsonObject&     createCurrentStateJsonObject(JsonObject& object, JsonObject& color);
         uint8_t         saveCurrentState();
 };
