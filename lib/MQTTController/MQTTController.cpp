@@ -10,14 +10,12 @@ MQTTController::MQTTController()
 }
 
 void MQTTController::setup(
-    String v,
     WiFiController* wc,
     LedshelfConfig* c,
     CallbackFunction fn
 ) {
     wifiCtrl   = wc;
     config     = c;
-    version    = v;
     onCallback = fn;
 
     Serial.printf("Setting up MQTT Client: %s %i\n", config->server.c_str(), config->port);
@@ -44,11 +42,14 @@ void MQTTController::checkConnection()
     client.loop();
 }
 
-void MQTTController::publishState(LightStateController& state)
+void MQTTController::publishState(Light& light)
 {
-    char json[256];
-    state.printStateJsonTo(json);
-    client.publish(config->stateTopic().c_str(), json, true);
+    //char json[256];
+    // light.state.printStateJsonTo(json);
+    Serial.printf("    - doing publish state for: %s\n", light.getStateTopic().c_str());
+    String json = light.getStateAsJSON();
+    Serial.println(json);
+    client.publish(light.getStateTopic().c_str(), json.c_str(), true);
 }
 
 void MQTTController::publishInformation(const char* message)
