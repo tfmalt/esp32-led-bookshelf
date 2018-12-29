@@ -58,6 +58,8 @@ class LedshelfConfig {
         const uint16_t &num_leds;
         const uint16_t &milliamps;
 
+        std::vector<LightConfig> lights;
+
         String stateTopic();
         String commandTopic();
         String statusTopic();
@@ -85,8 +87,6 @@ class LedshelfConfig {
         String      mqtt_update_topic;
         uint16_t    mqtt_num_leds;
         uint16_t    mqtt_milliamps;
-
-        std::vector<LightConfig> lights;
 
         void parseConfigFile();
         void readCAFile();
