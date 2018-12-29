@@ -2,7 +2,7 @@
 #define Effects_h
 
 #include <FastLED.h>
-#include <LightStateController.h>
+#include <LightState.h>
 #include <Arduino.h>
 #include <ArduinoOTA.h>
 
@@ -11,7 +11,7 @@ class Effects {
         typedef void            (Effects::*LightCmd)();
         LightCmd                currentCommand;
         LightCmd                currentEffect;
-        LightStateController*   lightState;
+        LightState*             lightState;
         CRGB*                   leds;
 
         uint8_t                 FPS                 = 0;
@@ -69,7 +69,7 @@ class Effects {
         void runCurrentCommand();
         void runCurrentEffect();
         void setFPS(uint8_t f);
-        void setLightStateController(LightStateController *l);
+        void setLightState(LightState *l);
         void setCommandFrames(uint16_t i);
         void setLeds(CRGB* l, const uint16_t &n);
         Effect getCurrentEffect();

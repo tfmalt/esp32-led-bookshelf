@@ -15,7 +15,7 @@ void Effects::setFPS(uint8_t f)
     FPS = f;
 }
 
-void Effects::setLightStateController(LightStateController *l)
+void Effects::setLightState(LightState *l)
 {
     lightState = l;
 }
@@ -27,7 +27,7 @@ void Effects::setCommandFrames(uint16_t i)
 
 void Effects::setCurrentCommand(Command cmd)
 {
-    LightState state   = lightState->getCurrentState();
+    LightStateData state   = lightState->getCurrentState();
     commandFrameCount  = 0;
     commandStart       = millis();
     currentCommandType = cmd;
@@ -70,7 +70,7 @@ Effects::Effect Effects::getEffectFromString(String str)
 
 void Effects::setCurrentEffect(Effect effect)
 {
-    LightState state = lightState->getCurrentState();
+    LightStateData state = lightState->getCurrentState();
     currentEffectType = effect;
 
     switch(effect) {
@@ -130,7 +130,7 @@ void Effects::cmdFirmwareUpdate()
 
 void Effects::cmdSetBrightness()
 {
-    LightState state = lightState->getCurrentState();
+    LightStateData state = lightState->getCurrentState();
 
     uint8_t  target   = state.brightness;
     uint8_t  current  = FastLED.getBrightness();
@@ -203,7 +203,7 @@ void Effects::fadeTowardColor( CRGB* L, uint16_t N, const CRGB& bgColor, uint8_t
 
 void Effects::cmdFadeTowardColor()
 {
-    LightState state = lightState->getCurrentState();
+    LightStateData state = lightState->getCurrentState();
     CRGB targetColor(state.color.r, state.color.g, state.color.b);
 
     fadeTowardColor(leds, numberOfLeds, targetColor, 12);
@@ -253,24 +253,24 @@ void Effects::effectGlitterRainbow()
 
 void Effects::effectConfetti()
 {
-  // random colored speckles that blink in and fade smoothly
-  fadeToBlackBy( leds, numberOfLeds, 20);
-  int pos = random16(numberOfLeds);
-  leds[pos] += CHSV( startHue + random8(64), 200, 255);
+    // random colored speckles that blink in and fade smoothly
+    fadeToBlackBy( leds, numberOfLeds, 20);
+    int pos = random16(numberOfLeds);
+    leds[pos] += CHSV( startHue + random8(64), 200, 255);
 }
 
 // a colored dot sweeping back and forth, with fading trails
 void Effects::effectSinelon()
 {
-  fadeToBlackBy( leds, numberOfLeds, 60 );
-  LightState state = lightState->getCurrentState();
+    fadeToBlackBy( leds, numberOfLeds, 60 );
+    LightStateData state = lightState->getCurrentState();
 
-    // calculate a suiting pulserate for the number of leds.
-  uint8_t bpm = 1000 / numberOfLeds;
+      // calculate a suiting pulserate for the number of leds.
+    uint8_t bpm = 1000 / numberOfLeds;
 
-  int pos = beatsin16(bpm, 0, numberOfLeds-1 );
-  // leds[pos] += CHSV( startHue, 255, 255);
-  leds[pos] += CRGB(state.color.r, state.color.g, state.color.b);
+    int pos = beatsin16(bpm, 0, numberOfLeds-1 );
+    // leds[pos] += CHSV( startHue, 255, 255);
+    leds[pos] += CRGB(state.color.r, state.color.g, state.color.b);
 }
 
 /**
