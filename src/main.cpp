@@ -20,15 +20,16 @@
 #include <WiFiController.h>
 #include <FastLED.h>
 #include <NTPClient.h>
+#include <map>
 #include <Effects.h>
 #include <MQTTController.h>
 #include <LedshelfConfig.h>
-#include <LightStateController.h>
+#include <LightState.h>
 #include <Light.h>
 
 FASTLED_USING_NAMESPACE
 
-static const String VERSION = "v0.3.6";
+static const String VERSION = "v0.3.7";
 
 // Fastled definitions
 static const uint8_t GPIO_DATA         = 18;
@@ -42,13 +43,13 @@ static const uint8_t FASTLED_SHOW_CORE = 0;
 // global objects
 CRGBArray<NUM_LEDS>   leds;
 LedshelfConfig        config;         // read from json config file.
-LightStateController  lightState;     // Own object. Responsible for state.
+LightState  lightState;     // Own object. Responsible for state.
 WiFiController        wifiCtrl;
 MQTTController        mqttCtrl; // This object is created in library.
 Effects               effects;
-Light                 topLeft;
 WiFiUDP               ntpUDP;
 NTPClient             timeClient(ntpUDP, "europe.pool.ntp.org", 3600, 60000);
+std::map<String, Light>    lights;
 
 uint16_t commandFrames     = FPS;
 uint16_t commandFrameCount = 0;
@@ -74,27 +75,44 @@ void setupFastLED()
     Serial.println("Setting up LED");
     Serial.printf("  - number of leds: %i\n", NUM_LEDS);
     Serial.printf("  - maximum milliamps: %i\n", config.milliamps);
+    Serial.printf("  - number of separate lights: %i\n", config.lights.size());
 
-    lightState.initialize();
-    LightState& currentState = lightState.getCurrentState();
+    // lightState.initialize();
+    // LightStateData& currentState = lightState.getCurrentState();
 
-    Serial.printf("  - state is: '%s'\n", currentState.state ? "On" : "Off");
+    // Serial.printf("  - state is: '%s'\n", currentState.state ? "On" : "Off");
 
     FastLED.addLeds<WS2812B, GPIO_DATA, GRB>(leds, NUM_LEDS).setCorrection(UncorrectedColor);
     FastLED.setMaxPowerInVoltsAndMilliamps(5, config.milliamps);
-    FastLED.setBrightness(currentState.state ? currentState.brightness : 0);
 
-    topLeft.addLeds(leds);
-    topLeft.addSegment(Light::Segment::Top, 0, 15);
+    LightConfig allConf = {
+        String("light"),
+        {0, NUM_LEDS-1},
+        {NUM_LEDS-1, 0},
+        config.command_topic,
+        config.state_topic
+    };
 
-    effects.setFPS(FPS);
-    effects.setLightStateController(&lightState);
-    effects.setLeds(leds, NUM_LEDS);
-    effects.setCurrentEffect(currentState.effect);
-    effects.setStartHue(currentState.color.h);
+    // const char* username = config.username.c_str();
+    lights["light"] = Light(leds, FPS, allConf, config.username);
+    for (LightConfig item : config.lights) {
+        lights[item.name] = Light(leds, FPS, item, config.username);
+    }
+
+    uint8_t brightness = lights["light"].getBrightness();
+    Serial.printf("  - initial brightness: %i\n", brightness);
+    FastLED.setBrightness(brightness);
+
+    // effects.setFPS(FPS);
+    // effects.setLightState(&lightState);
+    // effects.setLeds(leds, NUM_LEDS);
+    // effects.setCurrentEffect(currentState.effect);
+    // effects.setStartHue(currentState.color.h);
 
     mqttCtrl.publishStatus();
-    mqttCtrl.publishState(lightState);
+    for(auto & item : lights) {
+        mqttCtrl.publishState(item.second);
+    }
     publishInformationData();
 }
 
@@ -145,7 +163,7 @@ void setupArduinoOTA()
  * Looks over the new state and dispatches updates to effects and issues
  * commands.
  */
-void handleNewState(LightState& state) {
+void handleNewState(LightStateData& state) {
     if (state.state == false) {
         FastLED.setBrightness(0);
         return;
@@ -249,6 +267,30 @@ void handleOTAUpdate()
     effects.runCurrentCommand();
 }
 
+void mqttCallback(char* topic, byte* message, unsigned int length)
+{
+    Serial.printf("- MQTT Got topic: '%s'\n", topic);
+
+    if (effects.currentCommandType == Effects::Command::FirmwareUpdate) {
+        mqttCtrl.publishInformation("Firmware update active. Ignoring command.");
+        return;
+    }
+
+    if (config.commandTopic().equals(topic)) {
+        handleNewState(lightState.parseNewState(message));
+        // mqttCtrl.publishState(lightState);
+        return;
+    }
+
+    if (config.updateTopic().equals(topic)) {
+        handleOTAUpdate();
+        return;
+    }
+
+    Serial.printf("- ERROR: Not a valid topic: '%s'. IGNORING\n", topic);
+    return;
+}
+
 void setup()
 {
     Serial.begin(115200);
@@ -256,44 +298,15 @@ void setup()
 
     config.setup();
     wifiCtrl.setup(&config);
-    mqttCtrl.setup(VERSION, &wifiCtrl, &config,
-        [](char* topic, byte* message, unsigned int length){
-            Serial.printf("- MQTT Got topic: '%s'\n", topic);
-
-            if (effects.currentCommandType == Effects::Command::FirmwareUpdate) {
-                mqttCtrl.publishInformation("Firmware update active. Ignoring command.");
-                return;
-            }
-
-            if (config.commandTopic().equals(topic)) {
-                handleNewState(lightState.parseNewState(message));
-                mqttCtrl.publishState(lightState);
-                return;
-            }
-
-            if (config.updateTopic().equals(topic)) {
-                handleOTAUpdate();
-                return;
-            }
-
-            Serial.printf("- ERROR: Not a valid topic: '%s'. IGNORING\n", topic);
-            return;
-        }
-    );
+    mqttCtrl.setup(&wifiCtrl, &config, mqttCallback);
 
     wifiCtrl.connect();
-    Serial.printf("Waiting for WiFi ");
-    while (WiFi.status() != WL_CONNECTED) {
-        Serial.printf(".");
-        delay(100);
-    }
-    Serial.printf("\n");
     mqttCtrl.connect();
     timeClient.begin();
     timeClient.update();
 
     setupArduinoOTA();
-
+    Serial.println("Waiting for LEDs ...");
     delay(3000);
     setupFastLED();
 }
