@@ -42,19 +42,10 @@ void MQTTController::checkConnection()
     client.loop();
 }
 
-void MQTTController::publishState(Light& light)
+void MQTTController::subscribe(const char* topic)
 {
-    //char json[256];
-    // light.state.printStateJsonTo(json);
-    Serial.printf("    - doing publish state for: %s\n", light.getStateTopic().c_str());
-    String json = light.getStateAsJSON();
-    Serial.println(json);
-    client.publish(light.getStateTopic().c_str(), json.c_str(), true);
-}
-
-void MQTTController::publishInformation(const char* message)
-{
-    client.publish(config->informationTopic().c_str(), message, false);
+    Serial.printf("  - MQTT subscribing to: %s\n", topic);
+    client.subscribe(topic);
 }
 
 void MQTTController::connect()
@@ -79,8 +70,6 @@ void MQTTController::connect()
             0, true, "Disconnected")
         ) {
             Serial.println(" connected");
-
-            client.subscribe(config->commandTopic().c_str());
             client.subscribe(config->queryTopic().c_str());
             client.subscribe(config->updateTopic().c_str());
         }
@@ -97,4 +86,16 @@ void MQTTController::publishStatus()
     client.publish(config->statusTopic().c_str(), "Online", true);
 }
 
-// Trying to create a global object
+void MQTTController::publishState(Light& light)
+{
+    client.publish(
+        light.getStateTopic().c_str(),
+        light.getStateAsJSON().c_str(),
+        true
+    );
+}
+
+void MQTTController::publishInformation(const char* message)
+{
+    client.publish(config->informationTopic().c_str(), message, false);
+}

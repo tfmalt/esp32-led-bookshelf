@@ -29,6 +29,7 @@ class MQTTController {
         void publishStatus();
         void publishState(Light& light);
         void connect();
+        void subscribe(const char* topic);
 
     private:
         PubSubClient            client;
