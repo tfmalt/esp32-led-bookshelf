@@ -7,19 +7,72 @@
 #include <ArduinoOTA.h>
 
 class Effects {
+    public:
+        enum Command {
+            Null,
+            None,
+            Empty,
+            Brightness,
+            GlobalBrightness,
+            Color,
+            FirmwareUpdate,
+            TurnOff,
+            TurnOn
+        };
+        enum Effect {
+            Confetti,
+            BPM,
+            GlitterRainbow,
+            Rainbow,
+            RainbowByShelf,
+            Juggle,
+            Sinelon,
+            NullEffect,
+            EmptyEffect,
+            NoEffect
+        };
+        Effects();
+        Effects(LightState* l, uint8_t f);
+
+        Command  currentCommandType;
+        Effect   currentEffectType;
+        ulong    commandStart = 0;
+
+        void setCurrentCommand(Command cmd);
+        void setCurrentEffect(String effect);
+        void setCurrentEffect(Effect effect);
+        Effect getEffectFromString(String str);
+        void runCurrentCommand();
+        void runCurrentEffect();
+        void setFPS(uint8_t f);
+        void setLightState(LightState *l);
+        void setCommandFrames(uint16_t i);
+        void setLeds(CRGB* l);
+        void setLeds(CRGB* l, const uint16_t &n);
+        Effect getCurrentEffect();
+        void setStartHue(float hue);
+        void setTop(uint16_t start, uint16_t stop);
+        void setBottom(uint16_t start, uint16_t stop);
+
     private:
-        typedef void            (Effects::*LightCmd)();
-        LightCmd                currentCommand;
-        LightCmd                currentEffect;
-        LightState*             lightState;
-        CRGB*                   leds;
+        typedef void (Effects::*LightCmd)();
+        LightCmd     currentCommand;
+        LightCmd     currentEffect;
+        LightState*  lightState;
+        CRGB*        leds;
 
-        uint8_t                 FPS                 = 0;
-        uint16_t                numberOfLeds        = 0;
-        uint8_t                 startHue            = 0;
-        uint16_t                commandFrameCount   = 0;
-        uint16_t                commandFrames       = 0;
+        uint8_t  FPS                 = 0;
+        uint16_t numberOfLeds        = 0;
+        uint8_t  startHue            = 0;
+        uint16_t commandFrameCount   = 0;
+        uint16_t commandFrames       = 0;
 
+        uint16_t topStart    = 0;
+        uint16_t topStop     = 0;
+        uint16_t bottomStart = 0;
+        uint16_t bottomStop  = 0;
+
+        void initialize();
         void cmdEmpty();
         void cmdSetBrightness();
         void cmdFadeTowardColor();
@@ -36,44 +89,6 @@ class Effects {
         void effectConfetti();
         void effectSinelon();
         void effectJuggle();
-
-    public:
-        enum Command {
-            Null,
-            None,
-            Empty,
-            Brightness,
-            Color,
-            FirmwareUpdate
-        };
-        enum Effect {
-            Confetti,
-            BPM,
-            GlitterRainbow,
-            Rainbow,
-            RainbowByShelf,
-            Juggle,
-            Sinelon,
-            NullEffect,
-            EmptyEffect,
-            NoEffect
-        };
-        Command  currentCommandType;
-        Effect   currentEffectType;
-        ulong    commandStart = 0;
-        Effects();
-        void setCurrentCommand(Command cmd);
-        void setCurrentEffect(String effect);
-        void setCurrentEffect(Effect effect);
-        Effect getEffectFromString(String str);
-        void runCurrentCommand();
-        void runCurrentEffect();
-        void setFPS(uint8_t f);
-        void setLightState(LightState *l);
-        void setCommandFrames(uint16_t i);
-        void setLeds(CRGB* l, const uint16_t &n);
-        Effect getCurrentEffect();
-        void setStartHue(float hue);
 };
 
 #endif // Effects_h

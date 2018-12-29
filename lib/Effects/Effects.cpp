@@ -2,7 +2,24 @@
 #include "Effects.h"
 // #include <FastLED.h>
 
-Effects::Effects() {
+Effects::Effects()
+{
+    initialize();
+}
+
+Effects::Effects(LightState* l, uint8_t f)
+{
+    initialize();
+
+    setLightState(l);
+    setFPS(f);
+
+    setCurrentEffect(lightState->getCurrentState().effect);
+    setStartHue(lightState->getCurrentState().color.h);
+}
+
+void Effects::initialize()
+{
     currentCommand = &Effects::cmdEmpty;
     currentEffect  = &Effects::cmdEmpty;
 
@@ -23,6 +40,18 @@ void Effects::setLightState(LightState *l)
 void Effects::setCommandFrames(uint16_t i)
 {
     commandFrames = i;
+}
+
+void Effects::setTop(uint16_t start, uint16_t stop)
+{
+    topStart = start;
+    topStop  = stop;
+}
+
+void Effects::setBottom(uint16_t start, uint16_t stop)
+{
+    bottomStart = start;
+    bottomStop  = stop;
 }
 
 void Effects::setCurrentCommand(Command cmd)
@@ -207,6 +236,11 @@ void Effects::cmdFadeTowardColor()
     CRGB targetColor(state.color.r, state.color.g, state.color.b);
 
     fadeTowardColor(leds, numberOfLeds, targetColor, 12);
+}
+
+void Effects::setLeds(CRGB* l)
+{
+    leds = l;
 }
 
 void Effects::setLeds(CRGB* l, const uint16_t &n)
