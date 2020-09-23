@@ -9,7 +9,7 @@
  *
  * MIT License
  *
- * Copyright (c) 2018 Thomas Malt
+ * Copyright (c) 2018-2019 Thomas Malt
  */
 
 #define DEBUG 1
@@ -29,7 +29,7 @@
 
 FASTLED_USING_NAMESPACE
 
-static const String VERSION = "v0.3.8";
+static const String VERSION = "v0.3.10";
 
 // Fastled definitions
 static const uint8_t GPIO_DATA         = 18;
@@ -43,12 +43,11 @@ static const uint8_t FASTLED_SHOW_CORE = 0;
 // global objects
 CRGBArray<NUM_LEDS>   leds;
 LedshelfConfig        config;         // read from json config file.
-LightState  lightState;     // Own object. Responsible for state.
 WiFiController        wifiCtrl;
 MQTTController        mqttCtrl; // This object is created in library.
-Effects               effects;
 WiFiUDP               ntpUDP;
 NTPClient             timeClient(ntpUDP, "europe.pool.ntp.org", 3600, 60000);
+
 std::map<String, Light>    lights;
 
 uint16_t commandFrames     = FPS;
@@ -88,18 +87,18 @@ void setupFastLED()
         config.state_topic
     };
 
-    lights["light"] = Light(leds, FPS, allConf, config.username);
+    lights["light"] = Light(leds, NUM_LEDS, FPS, allConf, config.username);
     lights["light"].isMaster(true);
     for (LightConfig item : config.lights) {
-        lights[item.name] = Light(leds, FPS, item, config.username);
+        lights[item.name] = Light(leds, NUM_LEDS, FPS, item, config.username);
     }
 
     FastLED.setBrightness(lights["light"].getBrightness());
 
     mqttCtrl.publishStatus();
-    for(auto & item : lights) {
-        mqttCtrl.subscribe(item.second.getCommandTopic().c_str());
-        mqttCtrl.publishState(item.second);
+    for(auto & i : lights) {
+        mqttCtrl.subscribe(i.second.getCommandTopic().c_str());
+        mqttCtrl.publishState(i.second);
     }
     publishInformationData();
 }
@@ -147,22 +146,37 @@ void setupArduinoOTA()
         });
 }
 
+Light* getMasterLight()
+{
+    for (auto& i : lights) {
+        if (i.second.isMaster()) return &i.second;
+    }
+
+    Serial.println("Reached end of getmasterlight");
+    return nullptr;
+}
+
 void handleOTAUpdate()
 {
     mqttCtrl.publishInformation("Got update notification. Getting ready to perform firmware update.");
     Serial.println("Running ArduinoOTA");
-    ArduinoOTA.begin();
 
-    effects.setCurrentEffect(Effects::Effect::NullEffect);
-    effects.setCurrentCommand(Effects::Command::FirmwareUpdate);
-    effects.runCurrentCommand();
+    Light* master = getMasterLight();
+
+    master->setCurrentEffect(Effects::Effect::NullEffect);
+    master->setCurrentCommand(Effects::Command::FirmwareUpdate);
+    master->runCurrentCommand();
+
+    ArduinoOTA.begin();
 }
 
 void mqttCallback(char* topic, byte* message, unsigned int length)
 {
     Serial.printf("- MQTT Got topic: '%s'\n", topic);
 
-    if (effects.currentCommandType == Effects::Command::FirmwareUpdate) {
+    Light* master = getMasterLight();
+
+    if (master->getCurrentCommand() == Effects::Command::FirmwareUpdate) {
         mqttCtrl.publishInformation("Firmware update active. Ignoring command.");
         return;
     }
@@ -208,24 +222,29 @@ void setup()
 void loop() {
     mqttCtrl.checkConnection();
 
-    if (effects.currentCommandType == Effects::Command::FirmwareUpdate) {
+    Light* master = getMasterLight();
+    // Serial.printf("Got here: %s\n", master->getName().c_str());
+    if (master->getCurrentCommand() == Effects::Command::FirmwareUpdate) {
          ArduinoOTA.handle();
-         if (millis() > (effects.commandStart + 180000)) {
+         if (millis() > (master->getCommandStart() + 180000)) {
              mqttCtrl.publishInformation("No update started for 180s. Rebooting.");
              ESP.restart();
          }
     } else {
 
-        effects.runCurrentCommand();
-        effects.runCurrentEffect();
+        for (auto& i : lights) {
+            i.second.runCurrentCommand();
+            // i.second.runCurrentEffect();
+        }
+        // effects.runCurrentCommand();
+        // effects.runCurrentEffect();
 
         EVERY_N_SECONDS(60) {
             mqttCtrl.publishStatus();
             publishInformationData();
         }
-        // fastLEDshowESP32();
+
         FastLED.show();
         delay(1000/FPS);
     }
 }
-

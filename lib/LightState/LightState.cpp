@@ -8,7 +8,7 @@
 #include <FS.h>
 #include <ArduinoJson.h>
 
-#define DEBUG 1
+// #define DEBUG 1
 
 LightState::LightState()
 {
@@ -73,7 +73,6 @@ LightStateData& LightState::parseNewState(byte* payload)
         Serial.printf("ERROR: parsing of new state threw error: %s\n", error.c_str());
     }
 
-    Serial.println("  - Saving current state to file.");
     saveCurrentState();
 
     return currentState;
@@ -99,6 +98,11 @@ Color LightState::getColorFromJsonObject(JsonObject& root)
     color.s = (float) cJson["s"];
 
     return color;
+}
+
+Color LightState::getColor()
+{
+    return currentState.color;
 }
 
 LightStateData LightState::getLightStateFromPayload(byte* payload)
@@ -202,43 +206,43 @@ JsonObject& LightState::createCurrentStateJsonObject(JsonObject& object, JsonObj
 uint8_t LightState::saveCurrentState()
 {
     StaticJsonBuffer<256> jsonBuffer;
-    Serial.printf("    - allocated jsonBuffer\n");
+    // Serial.printf("    - allocated jsonBuffer\n");
 
     JsonObject& object = jsonBuffer.createObject();
 
     if (object.success()) {
-        Serial.println("    - creation of json object successfull");
+       //  Serial.println("    - creation of json object successfull");
     }
     else {
-        Serial.printf("    - creation of json object failure\n");
+        // Serial.printf("    - creation of json object failure\n");
         return LIGHT_STATEFILE_JSON_FAILED;
     }
 
     JsonObject& color = jsonBuffer.createObject();
 
     if (color.success()) {
-        Serial.println("    - creation of json color successfull");
+        // Serial.println("    - creation of json color successfull");
     }
     else {
-        Serial.printf("    - creation of json color failure\n");
+        // Serial.printf("    - creation of json color failure\n");
         return LIGHT_STATEFILE_JSON_FAILED;
     }
 
     JsonObject& current = createCurrentStateJsonObject(object, color);
 
     if (current.success()) {
-        Serial.println("    - parsing of current object successfull");
+        // Serial.println("    - parsing of current object successfull");
     }
     else {
-        Serial.printf("    - parsing of current object failure\n");
+        // Serial.printf("    - parsing of current object failure\n");
         return LIGHT_STATEFILE_JSON_FAILED;
     }
 
-    Serial.printf("    - Getting ready to open: %s\n", stateFile.c_str());
+    // Serial.printf("    - Getting ready to open: %s\n", stateFile.c_str());
 
     File file = SPIFFS.open(stateFile.c_str(), "w");
     if(!file) {
-        Serial.printf("    - failed to open: %s\n", stateFile.c_str());
+        // Serial.printf("    - failed to open: %s\n", stateFile.c_str());
         return LIGHT_STATEFILE_NOT_FOUND;
     }
 

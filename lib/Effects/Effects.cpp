@@ -142,11 +142,12 @@ void Effects::runCurrentEffect()
 
 void Effects::cmdEmpty()
 {
-
+    // Serial.println("  - cmdEmpty");
 }
 
 void Effects::cmdFirmwareUpdate()
 {
+    Serial.println("  - cmdFirmwareUpdate");
     fill_solid(leds, 15, CRGB::Black);
     // fill_solid(leds, 15, CRGB::White);
     leds[3] = CRGB::White;
@@ -159,6 +160,7 @@ void Effects::cmdFirmwareUpdate()
 
 void Effects::cmdSetBrightness()
 {
+    Serial.println("  - cmdSetBrightness");
     LightStateData state = lightState->getCurrentState();
 
     uint8_t  target   = state.brightness;
@@ -215,27 +217,41 @@ CRGB Effects::fadeTowardColor( CRGB& cur, const CRGB& target, uint8_t amount)
  * This function modifies the pixel array in place.
  * Taken from: https://gist.github.com/kriegsman/d0a5ed3c8f38c64adcb4837dafb6e690
  */
-void Effects::fadeTowardColor( CRGB* L, uint16_t N, const CRGB& bgColor, uint8_t fadeAmount)
+void Effects::fadeTowardColor(const CRGB& bgColor, uint8_t fadeAmount)
 {
-    uint16_t check = 0;
-    for( uint16_t i = 0; i < N; i++) {
-        fadeTowardColor( L[i], bgColor, fadeAmount);
-        if (L[i] == bgColor) check++;
-    }
+    // uint16_t check = 0;
+    CRGBSet ledset(leds, numberOfLeds);
+    CRGBSet top = ledset(topStart, topStop);
+    CRGBSet bottom = ledset(bottomStart, bottomStop);
 
-    if (check == numberOfLeds) {
-        // currentCommand = cmdEmpty;
-        Serial.printf("  - fade towards color done in %lu ms.\n", (millis() - commandStart));
-        setCurrentCommand(Command::None);
-    }
+    Serial.printf("    - RGB: [%i, %i, %i]\n", bgColor.red, bgColor.green, bgColor.blue);
+
+    top.fill_solid(bgColor);
+    bottom.fill_solid(bgColor);
+
+    // for( uint16_t i = 0; i < N; i++) {
+    //     fadeTowardColor( L[i], bgColor, fadeAmount);
+    //     if (L[i] == bgColor) check++;
+    // }
+
+    // if (check == numberOfLeds) {
+    //     // currentCommand = cmdEmpty;
+    //     Serial.printf("  - fade towards color done in %lu ms.\n", (millis() - commandStart));
+    //     setCurrentCommand(Command::None);
+    // }
+    setCurrentCommand(Command::None);
 }
 
 void Effects::cmdFadeTowardColor()
 {
+    // Serial.printf("  - cmdFadeTowardColor: [%i, %i][%i, %i]\n", topStart, topStop, bottomStart, bottomStop);
     LightStateData state = lightState->getCurrentState();
-    CRGB targetColor(state.color.r, state.color.g, state.color.b);
+    auto col = lightState->getColor();
 
-    fadeTowardColor(leds, numberOfLeds, targetColor, 12);
+    Serial.printf("    - State RGB: [%i, %i, %i]\n", col.r, col.g, col.b);
+    CRGB targetColor(col.r, col.g, col.b);
+
+    fadeTowardColor(targetColor, 12);
 }
 
 void Effects::setLeds(CRGB* l)
@@ -243,7 +259,7 @@ void Effects::setLeds(CRGB* l)
     leds = l;
 }
 
-void Effects::setLeds(CRGB* l, const uint16_t &n)
+void Effects::setLeds(CRGB* l, const uint16_t n)
 {
     numberOfLeds = n;
     leds = l;
@@ -256,19 +272,19 @@ void Effects::effectRainbow()
 
 void Effects::effectRainbowByShelf()
 {
-    CRGBSet ledset(leds, numberOfLeds);
-    ledset(0, 63).fill_rainbow(startHue, 4);
-    ledset(64, 127) = ledset(63, 0);
-
-    if (numberOfLeds < 131) return;
-
-    ledset(128, 191).fill_rainbow(startHue+64, 4);
-    ledset(192, 255) = ledset(191,128);
-
-    if (numberOfLeds < 257) return;
-
-    ledset(256, 319).fill_rainbow(startHue+128, 4);
-    ledset(320, 383) = ledset(319, 256);
+    //    CRGBSet ledset(leds, numberOfLeds);
+    //    ledset(0, 63).fill_rainbow(startHue, 4);
+    //    ledset(64, 127) = ledset(63, 0);
+    //
+    //    if (numberOfLeds < 131) return;
+    //
+    //    ledset(128, 191).fill_rainbow(startHue+64, 4);
+    //    ledset(192, 255) = ledset(191,128);
+    //
+    //    if (numberOfLeds < 257) return;
+    //
+    //    ledset(256, 319).fill_rainbow(startHue+128, 4);
+    //    ledset(320, 383) = ledset(319, 256);
 }
 
 void Effects::addGlitter(fract8 chanceOfGlitter)
@@ -325,12 +341,13 @@ void Effects::effectBPM()
  */
 void Effects::effectJuggle()
 {
-  fadeToBlackBy( leds, numberOfLeds, 20);
-  byte dothue = 0;
-  for( int i = 0; i < 8; i++) {
-    leds[beatsin16( i+7, 0, numberOfLeds-1 )] |= CHSV(dothue, 200, 255);
-    dothue += 32;
-  }
+    Serial.println("  - effectJuggle");
+    fadeToBlackBy( leds, numberOfLeds, 20);
+    byte dothue = 0;
+    for( int i = 0; i < 8; i++) {
+        leds[beatsin16( i+7, 0, numberOfLeds-1 )] |= CHSV(dothue, 200, 255);
+        dothue += 32;
+    }
 }
 
 Effects::Effect Effects::getCurrentEffect()

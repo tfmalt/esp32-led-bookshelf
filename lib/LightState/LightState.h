@@ -54,6 +54,7 @@ class LightState {
         LightStateData& getCurrentState();
         void            printStateJsonTo(char* output);
         LightState&     setColor(Color c);
+        Color           getColor();
         String          getEffect();
 
     private:

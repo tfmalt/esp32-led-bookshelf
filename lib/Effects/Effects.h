@@ -48,7 +48,7 @@ class Effects {
         void setLightState(LightState *l);
         void setCommandFrames(uint16_t i);
         void setLeds(CRGB* l);
-        void setLeds(CRGB* l, const uint16_t &n);
+        void setLeds(CRGB* l, const uint16_t n);
         Effect getCurrentEffect();
         void setStartHue(float hue);
         void setTop(uint16_t start, uint16_t stop);
@@ -78,7 +78,7 @@ class Effects {
         void cmdFadeTowardColor();
         void cmdFirmwareUpdate();
 
-        void fadeTowardColor(CRGB *L, uint16_t N, const CRGB &bgColor, uint8_t fadeAmount);
+        void fadeTowardColor(const CRGB &bgColor, uint8_t fadeAmount);
         CRGB fadeTowardColor(CRGB &cur, const CRGB &target, uint8_t amount);
         void nblendU8TowardU8(uint8_t &cur, const uint8_t target, uint8_t amount);
         void addGlitter(fract8 chanceOfGlitter);

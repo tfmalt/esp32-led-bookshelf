@@ -9,10 +9,11 @@ Light::Light(CRGB* l)
     addLeds(l);
 }
 
-Light::Light(CRGB* l, uint8_t fps, LightConfig lc, String username) {
-    leds = l;
-    FPS  = fps;
-    name = lc.name;
+Light::Light(CRGB* l, uint16_t n, uint8_t fps, LightConfig lc, String username) {
+    leds         = l;
+    numberOfLeds = n;
+    FPS          = fps;
+    name         = lc.name;
 
     command_topic = String("/" + username + lc.command_topic);
     state_topic   = String("/" + username + lc.state_topic);
@@ -24,6 +25,7 @@ Light::Light(CRGB* l, uint8_t fps, LightConfig lc, String username) {
     state.initialize(filename);
 
     effects = Effects(&state, FPS);
+    effects.setLeds(leds, numberOfLeds);
     effects.setTop(topStart, topStop);
     effects.setBottom(bottomStart, bottomStop);
 }
@@ -219,9 +221,11 @@ void Light::handleColor(Color color)
     Serial.printf("  - Got color: [%i, %i, %i]\n", color.r, color.g, color.b);
 
     if (effects.getCurrentEffect() == Effects::Effect::NullEffect) {
+        Serial.println("    - nulleffect");
         effects.setCurrentCommand(Effects::Command::Color);
     }
     else {
+        Serial.println("    - setting hue");
         effects.setStartHue(color.h);
     }
 }
@@ -235,4 +239,39 @@ bool Light::isMaster(bool m)
 {
     master = m;
     return master;
+}
+
+Light& Light::setCurrentEffect(Effects::Effect e)
+{
+    effects.setCurrentEffect(e);
+    return *this;
+}
+
+Light& Light::setCurrentCommand(Effects::Command c)
+{
+    effects.setCurrentCommand(c);
+    return *this;
+}
+
+Light& Light::runCurrentCommand()
+{
+    // Serial.printf("%s: running current command\n", name.c_str());
+    effects.runCurrentCommand();
+    return *this;
+}
+
+Light& Light::runCurrentEffect()
+{
+    effects.runCurrentEffect();
+    return *this;
+}
+
+Effects::Command Light::getCurrentCommand()
+{
+    return effects.currentCommandType;
+}
+
+unsigned long Light::getCommandStart()
+{
+    return effects.commandStart;
 }

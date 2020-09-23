@@ -18,18 +18,26 @@ class Light {
 
         Light();
         Light(CRGB* l);
-        Light(CRGB* l, uint8_t fps, LightConfig lc, String username);
+        Light(CRGB* l, uint16_t n, uint8_t fps, LightConfig lc, String username);
 
         Light&  addLeds(CRGB* l);
         Light&  addSegment(Segment segment, uint16_t start, uint16_t stop);
         Light&  setCommandTopic(const char* topic);
         Light&  setStateTopic(const char* topic);
         Light&  setFPS(uint8_t fps);
+        Light&  setCurrentEffect(Effects::Effect e);
+        Light&  setCurrentCommand(Effects::Command c);
+        Light&  runCurrentCommand();
+        Light&  runCurrentEffect();
         uint8_t getBrightness();
         String  getStateAsJSON();
         String  getName();
         String  getStateTopic();
         String  getCommandTopic();
+        ulong   getCommandStart();
+
+        Effects::Command getCurrentCommand();
+
         void    onCommand(byte* message);
         bool    isMaster();
         bool    isMaster(bool m);
@@ -39,6 +47,7 @@ class Light {
         LightState  state;
 
         CRGB*       leds;
+        uint16_t    numberOfLeds;
         uint8_t     FPS;
         bool        master = false;
 
