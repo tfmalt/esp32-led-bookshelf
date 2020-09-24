@@ -4,7 +4,7 @@
 #include <NTPClient.h>
 #include <WiFiUdp.h>
 
-WiFiUDP   ntpUDP;
+WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", 3600, 60000);
 
 MQTTController::MQTTController()
@@ -13,16 +13,16 @@ MQTTController::MQTTController()
 
 void MQTTController::setup(
     String v,
-    WiFiController* wc,
-    LightStateController* lc,
-    LedshelfConfig* c,
-    Effects* e
-) {
-    wifiCtrl   = wc;
+    WiFiController *wc,
+    LightStateController *lc,
+    LedshelfConfig *c,
+    Effects *e)
+{
+    wifiCtrl = wc;
     lightState = lc;
-    config     = c;
-    effects    = e;
-    version    = v;
+    config = c;
+    effects = e;
+    version = v;
 
     Serial.printf("Setting up MQTT Client: %s %i\n", config->server.c_str(), config->port);
 
@@ -30,20 +30,22 @@ void MQTTController::setup(
 
     client.setClient(wifiCtrl->getWiFiClient());
     client.setServer(config->server.c_str(), config->port);
-    client.setCallback([this](char* p_topic, byte* p_message, unsigned int p_length) {
+    client.setCallback([this](char *p_topic, byte *p_message, unsigned int p_length) {
         callback(p_topic, p_message, p_length);
     });
 }
 
 void MQTTController::checkConnection()
 {
-    if (WiFi.status() != WL_CONNECTED) {
+    if (WiFi.status() != WL_CONNECTED)
+    {
         Serial.println("Restarting because WiFI not connected.");
         //delay(5000);
         ESP.restart();
         return;
     }
-    if (!client.connected()) {
+    if (!client.connected())
+    {
         Serial.printf("MQTT broker not connected: %s\n", config->server.c_str());
         connect();
     }
@@ -54,11 +56,11 @@ void MQTTController::checkConnection()
 void MQTTController::publishState()
 {
     char json[256];
-    lightState->printStateJsonTo(json);
+    lightState->serializeCurrentState(json, 256);
     client.publish(config->stateTopic().c_str(), json, true);
 }
 
-void MQTTController::publishInformation(const char* message)
+void MQTTController::publishInformation(const char *message)
 {
     client.publish(config->informationTopic().c_str(), message, false);
 }
@@ -66,7 +68,7 @@ void MQTTController::publishInformation(const char* message)
 void MQTTController::publishInformationData()
 {
     String message =
-        "{\"time\": \"" + timeClient.getFormattedTime() +"\", " +
+        "{\"time\": \"" + timeClient.getFormattedTime() + "\", " +
         "\"hostname\": \"" + String(WiFi.getHostname()) + "\", " +
         "\"ip\": \"" + String(WiFi.localIP().toString()) + "\", " +
         "\"version\": \"" + version + "\", " +
@@ -82,22 +84,25 @@ void MQTTController::publishInformationData()
  *
  * Parses message, dispatches commands and updates settings.
  */
-void MQTTController::callback (char* p_topic, byte* p_message, unsigned int p_length)
+void MQTTController::callback(char *p_topic, byte *p_message, unsigned int p_length)
 {
     Serial.printf("- MQTT Got topic: '%s'\n", p_topic);
-    if (effects->currentCommandType == Effects::Command::FirmwareUpdate) {
+    if (effects->currentCommandType == Effects::Command::FirmwareUpdate)
+    {
         publishInformation("Firmware update active. Ignoring command.");
         return;
     }
 
-    if (config->commandTopic().equals(p_topic)) {
+    if (config->commandTopic().equals(p_topic))
+    {
         // LightState& newState = lightState->parseNewState(p_message);
         handleNewState(lightState->parseNewState(p_message));
         publishState();
         return;
     }
 
-    if (config->updateTopic().equals(p_topic)) {
+    if (config->updateTopic().equals(p_topic))
+    {
         handleUpdate();
         return;
     }
@@ -111,82 +116,105 @@ void MQTTController::callback (char* p_topic, byte* p_message, unsigned int p_le
  * Looks over the new state and dispatches updates to effects and issues
  * commands.
  */
-void MQTTController::handleNewState(LightState& state) {
-    if (state.state == false) {
+void MQTTController::handleNewState(LightState &state)
+{
+    if (state.state == false)
+    {
         Serial.println("- Told to turn off");
         FastLED.setBrightness(0);
         return;
     }
 
-    if(state.status.hasBrightness)
+    if (state.status.hasBrightness)
     {
         Serial.printf("- Got new brightness: '%i'\n", state.brightness);
         effects->setCurrentCommand(Effects::Command::Brightness);
     }
-    else if(state.status.hasColor) {
+    else if (state.status.hasColor)
+    {
         Serial.println("  - Got color");
-        if (effects->getCurrentEffect() == Effects::Effect::NullEffect) {
+        if (effects->getCurrentEffect() == Effects::Effect::NullEffect)
+        {
             effects->setCurrentCommand(Effects::Command::Color);
         }
-        else {
+        else
+        {
             Serial.printf(
                 "    - Effect is: '%s' hue: %.2f\n",
-                state.effect.c_str(), state.color.h
-            );
+                state.effect.c_str(), state.color.h);
             effects->setStartHue(state.color.h);
         }
     }
-    else if (state.status.hasEffect) {
+    else if (state.status.hasEffect)
+    {
         Serial.printf("  - Got effect '%s'. Setting it.\n", state.effect.c_str());
         effects->setCurrentEffect(state.effect);
-        if (state.effect == "") {
+        if (state.effect == "")
+        {
             effects->setCurrentCommand(Effects::Command::Color);
         }
     }
-    else if (state.status.hasColorTemp) {
-        unsigned int kelvin = (1000000/state.color_temp);
+    else if (state.status.hasColorTemp)
+    {
+        unsigned int kelvin = (1000000 / state.color_temp);
         Serial.printf("  - Got color temp: %i mired = %i Kelvin\n", state.color_temp, kelvin);
 
         unsigned int temp = kelvin / 100;
 
         double red = 0;
-        if (temp <= 66) {
+        if (temp <= 66)
+        {
             red = 255;
         }
-        else {
+        else
+        {
             red = temp - 60;
             red = 329.698727446 * (pow(red, -0.1332047592));
-            if (red < 0)    red = 0;
-            if (red > 255)  red = 255;
+            if (red < 0)
+                red = 0;
+            if (red > 255)
+                red = 255;
         }
 
         double green = 0;
-        if (temp <= 66) {
+        if (temp <= 66)
+        {
             green = temp;
             green = 99.4708025861 * log(green) - 161.1195681661;
-            if (green < 0)      green = 0;
-            if (green > 255)    green = 255;
+            if (green < 0)
+                green = 0;
+            if (green > 255)
+                green = 255;
         }
-        else {
+        else
+        {
             green = temp - 60;
             green = 288.1221695283 * (pow(green, -0.0755148492));
-            if (green < 0)      green = 0;
-            if (green > 255)    green = 255;
+            if (green < 0)
+                green = 0;
+            if (green > 255)
+                green = 255;
         }
 
         double blue = 0;
-        if (temp >= 66) {
+        if (temp >= 66)
+        {
             blue = 255;
         }
-        else {
-            if (temp <= 19) {
+        else
+        {
+            if (temp <= 19)
+            {
                 blue = 0;
             }
-            else {
+            else
+            {
                 blue = temp - 10;
                 blue = 138.5177312231 * log(blue) - 305.0447927307;
-                if (blue < 0)   blue = 0;
-                if (blue > 255) blue = 255;
+                if (blue < 0)
+                    blue = 0;
+                if (blue > 255)
+                    blue = 255;
             }
         }
 
@@ -194,15 +222,15 @@ void MQTTController::handleNewState(LightState& state) {
             "    - RGB [%i, %i, %i]",
             static_cast<uint8_t>(red),
             static_cast<uint8_t>(green),
-            static_cast<uint8_t>(blue)
-        );
+            static_cast<uint8_t>(blue));
         state.color.r = static_cast<uint8_t>(red);
         state.color.g = static_cast<uint8_t>(green);
         state.color.b = static_cast<uint8_t>(blue);
 
         effects->setCurrentCommand(Effects::Command::Color);
     }
-    else {
+    else
+    {
         // assuming turn on is the only thing.
         effects->setCurrentCommand(Effects::Command::Brightness);
     }
@@ -228,19 +256,19 @@ void MQTTController::connect()
     Serial.printf("  - %s = ", config->server.c_str());
     Serial.println(mqttip);
 
-    while (!client.connected()) {
+    while (!client.connected())
+    {
         Serial.printf(
             "Attempting MQTT connection to \"%s\" \"%i\" as \"%s\" ... ",
-            config->server.c_str(), config->port, config->username.c_str()
-        );
+            config->server.c_str(), config->port, config->username.c_str());
 
         if (client.connect(
-            config->client.c_str(),
-            config->username.c_str(),
-            config->password.c_str(),
-            config->statusTopic().c_str(),
-            0, true, "Disconnected")
-        ) {
+                config->client.c_str(),
+                config->username.c_str(),
+                config->password.c_str(),
+                config->statusTopic().c_str(),
+                0, true, "Disconnected"))
+        {
             Serial.println(" connected");
             Serial.printf("  - status:  '%s'\n", config->statusTopic().c_str());
             Serial.printf("  - command: '%s'\n", config->commandTopic().c_str());
@@ -255,7 +283,8 @@ void MQTTController::connect()
             publishStatus();
             publishInformationData();
         }
-        else {
+        else
+        {
             Serial.print(" failed: ");
             Serial.println(client.state());
             delay(5000);

@@ -5,13 +5,14 @@
 #include <SPIFFS.h>
 #include <ArduinoJson.h>
 
-
 void LedshelfConfig::setup()
 {
-    if (SPIFFS.begin()) {
+    if (SPIFFS.begin())
+    {
         Serial.println("  - Mounting SPIFFS file system.");
     }
-    else {
+    else
+    {
         Serial.println("  - ERROR: Could not mount SPIFFS.");
         ESP.restart();
         return;
@@ -24,40 +25,49 @@ void LedshelfConfig::setup()
 void LedshelfConfig::parseConfigFile()
 {
     File file = SPIFFS.open(configFile, "r");
-    if(!file) {
-        Serial.println("  - failed to open file for reading");
+    if (!file)
+    {
+        Serial.print("  - failed to open file (");
+        Serial.print(configFile);
+        Serial.println(") for reading");
         return;
     }
 
-    const size_t bufferSize = JSON_OBJECT_SIZE(20) + 300;
+    // const size_t bufferSize = JSON_OBJECT_SIZE(20) + 300;
 
-    Serial.printf("  - Buffersize: %i\n", bufferSize);
+    Serial.printf("  - Reading config: %s\n", configFile.c_str());
+    // Serial.printf("    - Buffersize: %i\n", bufferSize);
 
-    StaticJsonBuffer<bufferSize> configBuffer;
-    JsonObject& root = configBuffer.parseObject(file);
-
-    if (!root.success()) {
-        Serial.println("  - parsing jsonBuffer failed");
-        return;
-    }
-
-    wifi_ssid               = root["ssid"].as<char*>();
-    wifi_psk                = root["psk"].as<char*>();
-    mqtt_server             = root["server"].as<char*>();
-    mqtt_port               = root["port"].as<uint16_t>();
-    mqtt_username           = root["username"].as<char*>();
-    mqtt_password           = root["password"].as<char*>();
-    mqtt_client             = root["client"].as<char*>();
-    mqtt_command_topic      = root["command_topic"].as<char*>();
-    mqtt_state_topic        = root["state_topic"].as<char*>();
-    mqtt_status_topic       = root["status_topic"].as<char*>();
-    mqtt_query_topic        = root["query_topic"].as<char*>();
-    mqtt_information_topic  = root["information_topic"].as<char*>();
-    mqtt_update_topic       = root["update_topic"].as<char*>();
-    mqtt_num_leds           = root["num_leds"].as<uint16_t>();
-    mqtt_milliamps          = root["milliamps"].as<uint16_t>();
+    DynamicJsonDocument config(2110);
+    auto error = deserializeJson(config, file);
 
     file.close();
+
+    if (error)
+    {
+        Serial.print("  - parsing jsonBuffer failed: ");
+        Serial.println(error.c_str());
+        return;
+    }
+
+    wifi_ssid = config["ssid"].as<char *>();
+    wifi_psk = config["psk"].as<char *>();
+    mqtt_server = config["server"].as<char *>();
+    mqtt_port = config["port"].as<uint16_t>();
+    mqtt_username = config["username"].as<char *>();
+    mqtt_password = config["password"].as<char *>();
+    mqtt_client = config["client"].as<char *>();
+    mqtt_command_topic = config["command_topic"].as<char *>();
+    mqtt_state_topic = config["state_topic"].as<char *>();
+    mqtt_status_topic = config["status_topic"].as<char *>();
+    mqtt_query_topic = config["query_topic"].as<char *>();
+    mqtt_information_topic = config["information_topic"].as<char *>();
+    mqtt_update_topic = config["update_topic"].as<char *>();
+    mqtt_num_leds = config["num_leds"].as<uint16_t>();
+    mqtt_milliamps = config["milliamps"].as<uint16_t>();
+
+    Serial.print("    - ssid: ");
+    Serial.println(wifi_ssid);
 }
 
 /**
@@ -69,13 +79,15 @@ void LedshelfConfig::readCAFile()
 
     File file = SPIFFS.open(caFile, "r");
 
-    if (!file) {
+    if (!file)
+    {
         Serial.printf("  - Failed to open %s for reading\n", caFile.c_str());
         return;
     }
 
     ca_root_data = "";
-    while (file.available()) {
+    while (file.available())
+    {
         ca_root_data += file.readString();
     }
 
@@ -92,7 +104,8 @@ String LedshelfConfig::commandTopic()
     return String("/" + username + command_topic);
 }
 
-String LedshelfConfig::statusTopic() {
+String LedshelfConfig::statusTopic()
+{
     return String("/" + username + status_topic);
 }
 

@@ -25,15 +25,15 @@
 
 FASTLED_USING_NAMESPACE
 
-static const String VERSION = "v0.3.5";
+static const String VERSION = "v0.4.0";
 
 // Fastled definitions
-static const uint8_t GPIO_DATA         = 18;
+static const uint8_t GPIO_DATA = 18;
 
 // 130 bed lights
 // 384 shelf lights
-static const uint16_t NUM_LEDS         = 256;
-static const uint8_t FPS               = 60;
+static const uint16_t NUM_LEDS = 256;
+static const uint8_t FPS = 60;
 static const uint8_t FASTLED_SHOW_CORE = 0;
 
 // Using esp32 other core to run FastLED.show().
@@ -44,17 +44,17 @@ static const uint8_t FASTLED_SHOW_CORE = 0;
 // A command to hold the command we're currently executing.
 
 // global objects
-CRGBArray<NUM_LEDS>   leds;
-LedshelfConfig        config;         // read from json config file.
-LightStateController  lightState;     // Own object. Responsible for state.
-WiFiController        wifiCtrl;
-MQTTController        mqttCtrl; // This object is created in library.
-Effects               effects;
+CRGBArray<NUM_LEDS> leds;
+LedshelfConfig config;           // read from json config file.
+LightStateController lightState; // Own object. Responsible for state.
+WiFiController wifiCtrl;
+MQTTController mqttCtrl; // This object is created in library.
+Effects effects;
 
-uint16_t commandFrames     = FPS;
+uint16_t commandFrames = FPS;
 uint16_t commandFrameCount = 0;
-ulong    commandStart      = 0;
-uint8_t  updateProgress    = 0;
+ulong commandStart = 0;
+uint8_t updateProgress = 0;
 
 /**
  * show() for ESP32
@@ -110,7 +110,7 @@ void setupFastLED()
     Serial.printf("  - maximum milliamps: %i\n", config.milliamps);
 
     lightState.initialize();
-    LightState& currentState = lightState.getCurrentState();
+    LightState &currentState = lightState.getCurrentState();
 
     Serial.printf("  - state is: '%s'\n", currentState.state ? "On" : "Off");
 
@@ -152,24 +152,25 @@ void setupArduinoOTA()
         .onError([](ota_error_t error) {
             Serial.printf("Error[%u]: ", error);
             String errmsg;
-            switch (error) {
-                case OTA_AUTH_ERROR:
-                    errmsg = "Authentication failed";
-                    break;
-                case OTA_BEGIN_ERROR:
-                    errmsg = "Begin failed";
-                    break;
-                case OTA_CONNECT_ERROR:
-                    errmsg = "Connect failed";
-                    break;
-                case OTA_RECEIVE_ERROR:
-                    errmsg = "Receive failed";
-                    break;
-                case OTA_END_ERROR:
-                    errmsg = "End failed";
-                    break;
-                default:
-                    errmsg = "Unknown error";
+            switch (error)
+            {
+            case OTA_AUTH_ERROR:
+                errmsg = "Authentication failed";
+                break;
+            case OTA_BEGIN_ERROR:
+                errmsg = "Begin failed";
+                break;
+            case OTA_CONNECT_ERROR:
+                errmsg = "Connect failed";
+                break;
+            case OTA_RECEIVE_ERROR:
+                errmsg = "Receive failed";
+                break;
+            case OTA_END_ERROR:
+                errmsg = "End failed";
+                break;
+            default:
+                errmsg = "Unknown error";
             }
             String message = "Firmware Update Error [" + String(error) + "]: " + errmsg;
             mqttCtrl.publishInformation(message.c_str());
@@ -189,31 +190,36 @@ void setup()
 
     setupArduinoOTA();
 
-
     delay(3000);
     setupFastLED();
 }
 
-void loop() {
+void loop()
+{
     mqttCtrl.checkConnection();
 
-    if (effects.currentCommandType == Effects::Command::FirmwareUpdate) {
-         ArduinoOTA.handle();
-         if (millis() > (effects.commandStart + 180000)) {
-             mqttCtrl.publishInformation("No update started for 180s. Rebooting.");
-             ESP.restart();
-         }
-    } else {
+    if (effects.currentCommandType == Effects::Command::FirmwareUpdate)
+    {
+        ArduinoOTA.handle();
+        if (millis() > (effects.commandStart + 180000))
+        {
+            mqttCtrl.publishInformation("No update started for 180s. Rebooting.");
+            ESP.restart();
+        }
+    }
+    else
+    {
 
         effects.runCurrentCommand();
         effects.runCurrentEffect();
 
-        EVERY_N_SECONDS(60) {
+        EVERY_N_SECONDS(60)
+        {
             mqttCtrl.publishStatus();
             mqttCtrl.publishInformationData();
         }
         // fastLEDshowESP32();
         FastLED.show();
-        delay(1000/FPS);
+        delay(1000 / FPS);
     }
 }
