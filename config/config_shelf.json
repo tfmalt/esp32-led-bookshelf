@@ -1,0 +1,67 @@
+{
+  "ssid": "micronuke",
+  "psk": "For hjertet er livet enkelt",
+  "server": "mqtt.malt.no",
+  "port": 8883,
+  "username": "ledshelf",
+  "password": "cg22RNkQ827W42g3h55tZaAJswYLlh2y",
+  "client": "ledshelf marthas room",
+  "status_topic": "/status",
+  "query_topic": "/query",
+  "update_topic": "/update",
+  "command_topic": "/light/set",
+  "state_topic": "/light/state",
+  "information_topic": "/information",
+  "milliamps": 18000,
+  "num_leds": 384,
+  "lights": {
+    "top_left": {
+      "top": [0, 15],
+      "bottom": [16, 31],
+      "command_topic": "/topleft/set",
+      "state_topic": "/topleft/state"
+    },
+    "top_center": {
+      "top": [32, 63],
+      "bottom": [64, 95],
+      "command_topic": "/topcenter/set",
+      "state_topic": "/topcenter/state"
+    },
+    "top_right": {
+      "top": [96, 111],
+      "bottom": [112, 127],
+      "command_topic": "/topright/set",
+      "state_topic": "/topright/state"
+    },
+    "middle_left": {
+      "top": [0, 15],
+      "bottom": [16, 31],
+      "command_topic": "/middleleft/set",
+      "state_topic": "/middleleft/state"
+    },
+    "middle_right": {
+      "top": [32, 63],
+      "bottom": [64, 95],
+      "command_topic": "/middleright/set",
+      "state_topic": "/middleright/state"
+    },
+    "bottom_left": {
+      "top": [0, 15],
+      "bottom": [16, 31],
+      "command_topic": "/bottomleft/set",
+      "state_topic": "/bottomleft/state"
+    },
+    "bottom_center": {
+      "top": [32, 63],
+      "bottom": [64, 95],
+      "command_topic": "/bottomcenter/set",
+      "state_topic": "/bottomcenter/state"
+    },
+    "bottom_right": {
+      "top": [96, 111],
+      "bottom": [112, 127],
+      "command_topic": "/bottomright/set",
+      "state_topic": "/bottomright/state"
+    }
+  }
+}
