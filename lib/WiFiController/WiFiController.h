@@ -9,23 +9,24 @@
 #include <WiFiClientSecure.h>
 #include <LedshelfConfig.h>
 
-class WiFiController {
-    public:
-        WiFiController()
-        {
-            WiFi.disconnect(true);
-        };
+class WiFiController
+{
+public:
+    WiFiController()
+    {
+        WiFi.disconnect(true);
+    };
 
-        void                setup(LedshelfConfig* c);
-        void                connect();
-        void                testOutput();
-        WiFiClientSecure&   getWiFiClient();
+    void setup(LedshelfConfig &c);
+    void connect();
+    void testOutput();
+    WiFiClientSecure &getWiFiClient();
 
-    private:
-        WiFiClientSecure    wifiClient;
-        LedshelfConfig*     config;
+private:
+    WiFiClientSecure wifiClient;
+    LedshelfConfig config;
 
-        void handleEvent(WiFiEvent_t event);
+    void handleEvent(WiFiEvent_t event);
 };
 
 #endif // WiFiController_h

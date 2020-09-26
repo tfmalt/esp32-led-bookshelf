@@ -183,7 +183,7 @@ void setup()
     Serial.printf("Starting version %s...\n", VERSION.c_str());
 
     config.setup();
-    wifiCtrl.setup(&config);
+    wifiCtrl.setup(config);
     mqttCtrl.setup(VERSION, &wifiCtrl, &lightState, &config, &effects);
 
     wifiCtrl.connect();
