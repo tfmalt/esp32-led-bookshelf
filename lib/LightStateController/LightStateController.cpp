@@ -73,9 +73,6 @@ LightState &LightStateController::parseNewState(byte *payload)
     try
     {
         LightState newState = getLightStateFromPayload(payload);
-#ifdef DEBUG
-        printStateDebug(newState);
-#endif
         currentState = newState;
     }
     catch (LightState errState)
