@@ -1,16 +1,17 @@
 #include "WiFiController.h"
-#include <WiFiClientSecure.h>
+// #include <WiFiClientSecure.h>
+#include <WiFi.h>
 #include <LedshelfConfig.h>
 
-void WiFiController::setup(LedshelfConfig &config)
+void WiFiController::setup()
 {
     // config = c;
+    Serial.println("WiFI Controller setup:");
+    // Serial.println(config.ca_root);
 
     WiFi.onEvent([this](WiFiEvent_t event, WiFiEventInfo_t info) {
         handleEvent(event);
     });
-
-    wifiClient.setCACert(config.ca_root.c_str());
 }
 
 /**
@@ -18,19 +19,23 @@ void WiFiController::setup(LedshelfConfig &config)
  */
 void WiFiController::connect()
 {
-    Serial.printf("Connecting to: %s:\n", config.ssid.c_str());
+    Serial.printf("  - Connecting to: %s:%s\n", config.wifi_ssid, config.wifi_psk);
 
-    WiFi.begin(config.ssid.c_str(), config.psk.c_str());
-    WiFi.setHostname(config.username.c_str());
+    WiFi.begin(config.wifi_ssid, config.wifi_psk);
+    // WiFi.setHostname(config.mqtt_username);
 
     // Wait here until we are connected.
     while (WiFi.status() != WL_CONNECTED)
     {
-        delay(100);
+        Serial.print(".");
+        delay(1000);
     }
+
+    // wifiClient.setCACert(config.ca_root);
 };
 
-WiFiClientSecure &WiFiController::getWiFiClient()
+// WiFiClientSecure &WiFiController::getWiFiClient()
+WiFiClient &WiFiController::getWiFiClient()
 {
     return wifiClient;
 };
@@ -38,7 +43,7 @@ WiFiClientSecure &WiFiController::getWiFiClient()
 void WiFiController::testOutput()
 {
     Serial.printf("    - Testing output.\n");
-    Serial.println(config.ssid.c_str());
+    Serial.println(config.wifi_ssid);
 }
 
 void WiFiController::handleEvent(WiFiEvent_t event)
@@ -73,7 +78,7 @@ void WiFiController::handleEvent(WiFiEvent_t event)
         break;
     // SYSTEM_EVENT_STA_START                < ESP32 station start
     case SYSTEM_EVENT_STA_START:
-        Serial.printf("  - Starting ... [%i]\n", event);
+        Serial.printf("  - Starting [%i] ...\n", event);
         break;
     // SYSTEM_EVENT_STA_STOP                 < ESP32 station stop
     case SYSTEM_EVENT_STA_STOP:
@@ -81,7 +86,7 @@ void WiFiController::handleEvent(WiFiEvent_t event)
         break;
     // SYSTEM_EVENT_STA_CONNECTED            < ESP32 station connected to AP
     case SYSTEM_EVENT_STA_CONNECTED:
-        Serial.printf("  - Connected to access point [%s][%i]\n", config.ssid.c_str(), event);
+        Serial.printf("  - Connected to access point [%s][%i]\n", config.wifi_ssid, event);
         break;
     // SYSTEM_EVENT_STA_DISCONNECTED         < ESP32 station disconnected from AP
     case SYSTEM_EVENT_STA_DISCONNECTED:
