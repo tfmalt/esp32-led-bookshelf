@@ -4,7 +4,7 @@
 
 #include <Arduino.h>
 #include <ArduinoOTA.h>
-#include <WiFiClientSecure.h>
+#include <WiFi.h>
 #include <PubSubClient.h>
 #include <WiFiController.h>
 #include <LightStateController.h>
@@ -13,6 +13,8 @@
 
 class MQTTController
 {
+
+public:
     const char *version;
     LedshelfConfig &config;
     PubSubClient client;
@@ -20,7 +22,13 @@ class MQTTController
     LightStateController &lightState;
     Effects &effects;
 
-public:
+    char statusTopic[32];
+    char commandTopic[32];
+    char updateTopic[32];
+    char stateTopic[32];
+    char informationTopic[32];
+    char queryTopic[32];
+
     // MQTTController();
     MQTTController(
         const char *v_,

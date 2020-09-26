@@ -19,13 +19,23 @@ NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", 3600, 60000);
 
 void MQTTController::setup()
 {
+    Serial.printf("Setting up MQTT Client: %s %i\n", config.mqtt_server, config.mqtt_port);
 
-    Serial.printf("Setting up MQTT Client: %s %i\n", config.server.c_str(), config.port);
+    config.statusTopic(statusTopic);
+    config.commandTopic(commandTopic);
+    config.updateTopic(updateTopic);
+    config.stateTopic(stateTopic);
+    config.queryTopic(queryTopic);
+    config.informationTopic(informationTopic);
 
     timeClient.begin();
+    Serial.println("NTP time client started.");
 
-    client.setClient(wifiCtrl.getWiFiClient());
-    client.setServer(config.server.c_str(), config.port);
+    WiFiClient &wifi = wifiCtrl.getWiFiClient();
+    Serial.println("Got wifi client");
+
+    client.setClient(wifi);
+    client.setServer(config.mqtt_server, config.mqtt_port);
     client.setCallback([this](char *p_topic, byte *p_message, unsigned int p_length) {
         callback(p_topic, p_message, p_length);
     });
@@ -42,7 +52,7 @@ void MQTTController::checkConnection()
     }
     if (!client.connected())
     {
-        Serial.printf("MQTT broker not connected: %s\n", config.server.c_str());
+        Serial.printf("MQTT broker not connected: %s\n", config.mqtt_server);
         connect();
     }
 
@@ -53,26 +63,27 @@ void MQTTController::publishState()
 {
     char json[256];
     lightState.serializeCurrentState(json, 256);
-    client.publish(config.stateTopic().c_str(), json, true);
+
+    client.publish(stateTopic, json, true);
 }
 
 void MQTTController::publishInformation(const char *message)
 {
-    client.publish(config.informationTopic().c_str(), message, false);
+    client.publish(informationTopic, message, false);
 }
 
 void MQTTController::publishInformationData()
 {
-    String message =
-        "{\"time\": \"" + timeClient.getFormattedTime() + "\", " +
-        "\"hostname\": \"" + String(WiFi.getHostname()) + "\", " +
-        "\"ip\": \"" + String(WiFi.localIP().toString()) + "\", " +
-        "\"version\": \"" + version + "\", " +
-        "\"uptime\": " + millis() + ", " +
-        "\"memory\": " + xPortGetFreeHeapSize() +
-        "}";
+    char message[256];
+    char *msg = message;
 
-    publishInformation(message.c_str());
+    msg += sprintf(msg, "\"time\": \"%s\", ", timeClient.getFormattedTime().c_str());
+    msg += sprintf(msg, "\"hostname\": \"%s\", ", WiFi.getHostname());
+    msg += sprintf(msg, "\"version\": \"%s\", ", version);
+    msg += sprintf(msg, "\"uptime\": %d, ", millis());
+    msg += sprintf(msg, "\"memory\": %d }", xPortGetFreeHeapSize());
+
+    publishInformation(message);
 }
 
 /**
@@ -89,15 +100,16 @@ void MQTTController::callback(char *p_topic, byte *p_message, unsigned int p_len
         return;
     }
 
-    if (config.commandTopic().equals(p_topic))
+    if (strcmp(commandTopic, p_topic) == 0)
     {
+
         // LightState& newState = lightState.parseNewState(p_message);
         handleNewState(lightState.parseNewState(p_message));
         publishState();
         return;
     }
 
-    if (config.updateTopic().equals(p_topic))
+    if (strcmp(updateTopic, p_topic) == 0)
     {
         handleUpdate();
         return;
@@ -215,7 +227,7 @@ void MQTTController::handleNewState(LightState &state)
         }
 
         Serial.printf(
-            "    - RGB [%i, %i, %i]",
+            "    - RGB [%i, %i, %i]\n",
             static_cast<uint8_t>(red),
             static_cast<uint8_t>(green),
             static_cast<uint8_t>(blue));
@@ -247,34 +259,37 @@ void MQTTController::handleUpdate()
 void MQTTController::connect()
 {
     IPAddress mqttip;
-    WiFi.hostByName(config.server.c_str(), mqttip);
+    WiFi.hostByName(config.mqtt_server, mqttip);
 
-    Serial.printf("  - %s = ", config.server.c_str());
+    Serial.printf("  - %s = ", config.mqtt_server);
     Serial.println(mqttip);
 
     while (!client.connected())
     {
         Serial.printf(
-            "Attempting MQTT connection to \"%s\" \"%i\" as \"%s\" ... ",
-            config.server.c_str(), config.port, config.username.c_str());
+            "Attempting MQTT connection to \"%s\" \"%i\" as \"%s\" ...\n",
+            config.mqtt_server, config.mqtt_port, config.mqtt_username);
 
-        if (client.connect(
-                config.client.c_str(),
-                config.username.c_str(),
-                config.password.c_str(),
-                config.statusTopic().c_str(),
-                0, true, "Disconnected"))
+        Serial.printf("  - statusTopic: %s\n", statusTopic);
+
+        // if (client.connect(
+        //         config.mqtt_client,
+        //         config.mqtt_username,
+        //         config.mqtt_password,
+        //         statusTopic,
+        //         0, true, "Disconnected"))
+        if (client.connect(config.mqtt_client))
         {
             Serial.println(" connected");
-            Serial.printf("  - status:  '%s'\n", config.statusTopic().c_str());
-            Serial.printf("  - command: '%s'\n", config.commandTopic().c_str());
-            Serial.printf("  - update: '%s'\n", config.updateTopic().c_str());
+            Serial.printf("  - status:  '%s'\n", statusTopic);
+            Serial.printf("  - command: '%s'\n", commandTopic);
+            Serial.printf("  - update: '%s'\n", updateTopic);
 
             timeClient.update();
 
-            client.subscribe(config.commandTopic().c_str());
-            client.subscribe(config.queryTopic().c_str());
-            client.subscribe(config.updateTopic().c_str());
+            client.subscribe(commandTopic);
+            client.subscribe(queryTopic);
+            client.subscribe(updateTopic);
 
             publishStatus();
             publishInformationData();
@@ -292,7 +307,7 @@ void MQTTController::connect()
 
 void MQTTController::publishStatus()
 {
-    client.publish(config.statusTopic().c_str(), "Online", true);
+    client.publish(statusTopic, "Online", true);
 }
 
 // Trying to create a global object
