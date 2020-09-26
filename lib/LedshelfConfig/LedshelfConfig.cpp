@@ -33,12 +33,9 @@ void LedshelfConfig::parseConfigFile()
         return;
     }
 
-    // const size_t bufferSize = JSON_OBJECT_SIZE(20) + 300;
+    Serial.printf("  - Reading config: %s\n", configFile);
 
-    Serial.printf("  - Reading config: %s\n", configFile.c_str());
-    // Serial.printf("    - Buffersize: %i\n", bufferSize);
-
-    DynamicJsonDocument config(2110);
+    StaticJsonDocument<680> config;
     auto error = deserializeJson(config, file);
 
     file.close();
@@ -50,21 +47,22 @@ void LedshelfConfig::parseConfigFile()
         return;
     }
 
-    wifi_ssid = config["ssid"].as<char *>();
-    wifi_psk = config["psk"].as<char *>();
-    mqtt_server = config["server"].as<char *>();
-    mqtt_port = config["port"].as<uint16_t>();
-    mqtt_username = config["username"].as<char *>();
-    mqtt_password = config["password"].as<char *>();
-    mqtt_client = config["client"].as<char *>();
-    mqtt_command_topic = config["command_topic"].as<char *>();
-    mqtt_state_topic = config["state_topic"].as<char *>();
-    mqtt_status_topic = config["status_topic"].as<char *>();
-    mqtt_query_topic = config["query_topic"].as<char *>();
-    mqtt_information_topic = config["information_topic"].as<char *>();
-    mqtt_update_topic = config["update_topic"].as<char *>();
-    mqtt_num_leds = config["num_leds"].as<uint16_t>();
-    mqtt_milliamps = config["milliamps"].as<uint16_t>();
+    strlcpy(wifi_ssid, config["wifi"]["ssid"] | "", sizeof(wifi_ssid));
+    strlcpy(wifi_psk, config["wifi"]["psk"] | "", sizeof(wifi_psk));
+    strlcpy(mqtt_server, config["mqtt"]["server"] | "", sizeof(mqtt_server));
+    mqtt_port = config["mqtt"]["port"] | 1883;
+    mqtt_ssl = config["mqtt"]["ssl"] | false;
+    strlcpy(mqtt_username, config["mqtt"]["username"] | "", sizeof(mqtt_username));
+    strlcpy(mqtt_password, config["mqtt"]["password"] | "", sizeof(mqtt_password));
+    strlcpy(mqtt_client, config["mqtt"]["client"] | "", sizeof(mqtt_client));
+    strlcpy(mqtt_command_topic, config["mqtt"]["command_topic"] | "", sizeof(mqtt_command_topic));
+    strlcpy(mqtt_state_topic, config["mqtt"]["state_topic"] | "", sizeof(mqtt_state_topic));
+    strlcpy(mqtt_status_topic, config["mqtt"]["status_topic"] | "", sizeof(mqtt_status_topic));
+    strlcpy(mqtt_query_topic, config["mqtt"]["query_topic"] | "", sizeof(mqtt_query_topic));
+    strlcpy(mqtt_information_topic, config["mqtt"]["information_topic"] | "", sizeof(mqtt_information_topic));
+    strlcpy(mqtt_update_topic, config["mqtt"]["update_topic"] | "", sizeof(mqtt_update_topic));
+    fastled_num_leds = config["fastled"]["num_leds"] | 0;
+    fastled_milliamps = config["fastled"]["milliamps"] | 0;
 
     Serial.print("    - ssid: ");
     Serial.println(wifi_ssid);
@@ -75,51 +73,63 @@ void LedshelfConfig::parseConfigFile()
  */
 void LedshelfConfig::readCAFile()
 {
-    Serial.printf("Reading CA file: %s\n", caFile.c_str());
+    Serial.printf("Reading CA file: %s\n", caFile);
 
     File file = SPIFFS.open(caFile, "r");
 
     if (!file)
     {
-        Serial.printf("  - Failed to open %s for reading\n", caFile.c_str());
+        Serial.printf("  - Failed to open %s for reading\n", caFile);
         return;
     }
 
-    ca_root_data = "";
+    strcpy(ca_root, "");
     while (file.available())
     {
-        ca_root_data += file.readString();
+        strcat(ca_root, file.readString().c_str());
     }
 
     file.close();
 }
 
-String LedshelfConfig::stateTopic()
+void LedshelfConfig::stateTopic(char *topic)
 {
-    return String("/" + username + state_topic);
+    strcpy(topic, "/");
+    strcat(topic, mqtt_username);
+    strcat(topic, mqtt_state_topic);
 }
 
-String LedshelfConfig::commandTopic()
+void LedshelfConfig::commandTopic(char *topic)
 {
-    return String("/" + username + command_topic);
+    strcpy(topic, "/");
+    strcat(topic, mqtt_username);
+    strcat(topic, mqtt_command_topic);
 }
 
-String LedshelfConfig::statusTopic()
+void LedshelfConfig::statusTopic(char *topic)
 {
-    return String("/" + username + status_topic);
+    strcpy(topic, "/");
+    strcat(topic, mqtt_username);
+    strcat(topic, mqtt_status_topic);
 }
 
-String LedshelfConfig::queryTopic()
+void LedshelfConfig::queryTopic(char *topic)
 {
-    return String("/" + username + query_topic);
+    strcpy(topic, "/");
+    strcat(topic, mqtt_username);
+    strcat(topic, mqtt_query_topic);
 }
 
-String LedshelfConfig::informationTopic()
+void LedshelfConfig::informationTopic(char *topic)
 {
-    return String("/" + username + information_topic);
+    strcpy(topic, "/");
+    strcat(topic, mqtt_username);
+    strcat(topic, mqtt_information_topic);
 }
 
-String LedshelfConfig::updateTopic()
+void LedshelfConfig::updateTopic(char *topic)
 {
-    return String("/" + username + update_topic);
+    strcpy(topic, "/");
+    strcat(topic, mqtt_username);
+    strcat(topic, mqtt_update_topic);
 }

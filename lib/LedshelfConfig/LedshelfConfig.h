@@ -5,76 +5,44 @@
 #define LedshelfConfig_h
 #include <Arduino.h>
 
-class LedshelfConfig {
-    public:
-        LedshelfConfig() :
-            ca_root(ca_root_data),
-            ssid(wifi_ssid),
-            psk(wifi_psk),
-            server(mqtt_server),
-            state_topic(mqtt_state_topic),
-            command_topic(mqtt_command_topic),
-            status_topic(mqtt_status_topic),
-            query_topic(mqtt_query_topic),
-            information_topic(mqtt_information_topic),
-            update_topic(mqtt_update_topic),
-            port(mqtt_port),
-            username(mqtt_username),
-            password(mqtt_password),
-            client(mqtt_client),
-            num_leds(mqtt_num_leds),
-            milliamps(mqtt_milliamps)
-        {};
+class LedshelfConfig
+{
+public:
+    LedshelfConfig(){};
 
-        void setup();
+    void setup();
 
-        const String   &ca_root;
-        const String   &ssid;
-        const String   &psk;
-        const String   &server;
-        const String   &state_topic;
-        const String   &command_topic;
-        const String   &status_topic;
-        const String   &query_topic;
-        const String   &information_topic;
-        const String   &update_topic;
-        const uint16_t &port;
-        const String   &username;
-        const String   &password;
-        const String   &client;
-        const uint16_t &num_leds;
-        const uint16_t &milliamps;
+    char ca_root[1680];
+    char wifi_ssid[32];
+    char wifi_psk[32];
+    char mqtt_server[32];
+    uint16_t mqtt_port;
+    char mqtt_username[32];
+    char mqtt_password[32];
+    bool mqtt_ssl;
+    char mqtt_client[32];
+    char mqtt_command_topic[16];
+    char mqtt_state_topic[16];
+    char mqtt_status_topic[16];
+    char mqtt_query_topic[16];
+    char mqtt_information_topic[16];
+    char mqtt_update_topic[16];
+    uint16_t fastled_num_leds;
+    uint16_t fastled_milliamps;
 
-        String stateTopic();
-        String commandTopic();
-        String statusTopic();
-        String queryTopic();
-        String informationTopic();
-        String updateTopic();
+    void stateTopic(char *topic);
+    void commandTopic(char *topic);
+    void statusTopic(char *topic);
+    void queryTopic(char *topic);
+    void informationTopic(char *topic);
+    void updateTopic(char *topic);
 
-    private:
-        const String configFile = "/config.json";
-        const String caFile     = "/ca.pem";
+private:
+    const char *configFile = "/config.json";
+    const char *caFile = "/ca.pem";
 
-        String      ca_root_data;
-        String      wifi_ssid;
-        String      wifi_psk;
-        String      mqtt_server;
-        uint16_t    mqtt_port;
-        String      mqtt_username;
-        String      mqtt_password;
-        String      mqtt_client;
-        String      mqtt_command_topic;
-        String      mqtt_state_topic;
-        String      mqtt_status_topic;
-        String      mqtt_query_topic;
-        String      mqtt_information_topic;
-        String      mqtt_update_topic;
-        uint16_t    mqtt_num_leds;
-        uint16_t    mqtt_milliamps;
-
-        void parseConfigFile();
-        void readCAFile();
+    void parseConfigFile();
+    void readCAFile();
 };
 
 #endif // LedshelfConfig_h
