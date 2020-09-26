@@ -25,7 +25,7 @@
 
 FASTLED_USING_NAMESPACE
 
-static const String VERSION = "v0.4.0";
+static const char *VERSION = "v0.4.0";
 
 // Fastled definitions
 static const uint8_t GPIO_DATA = 18;
@@ -48,8 +48,8 @@ CRGBArray<NUM_LEDS> leds;
 LedshelfConfig config;           // read from json config file.
 LightStateController lightState; // Own object. Responsible for state.
 WiFiController wifiCtrl;
-MQTTController mqttCtrl; // This object is created in library.
 Effects effects;
+MQTTController mqttCtrl(VERSION, config, wifiCtrl, lightState, effects);
 
 uint16_t commandFrames = FPS;
 uint16_t commandFrameCount = 0;
@@ -180,11 +180,11 @@ void setupArduinoOTA()
 void setup()
 {
     Serial.begin(115200);
-    Serial.printf("Starting version %s...\n", VERSION.c_str());
+    Serial.printf("Starting version %s...\n", VERSION);
 
     config.setup();
     wifiCtrl.setup(config);
-    mqttCtrl.setup(VERSION, &wifiCtrl, &lightState, &config, &effects);
+    mqttCtrl.setup();
 
     wifiCtrl.connect();
 

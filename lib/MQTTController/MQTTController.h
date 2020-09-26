@@ -11,36 +11,36 @@
 #include <LedshelfConfig.h>
 #include <Effects.h>
 
-class MQTTController {
-    public:
-        MQTTController();
+class MQTTController
+{
+    const char *version;
+    LedshelfConfig &config;
+    PubSubClient client;
+    WiFiController &wifiCtrl;
+    LightStateController &lightState;
+    Effects &effects;
 
-        void setup(
-            String v,
-            WiFiController* wc,
-            LightStateController* lc,
-            LedshelfConfig* c,
-            Effects *e
-        );
-        void checkConnection();
-        void publishInformation(const char* message);
-        void publishInformationData();
-        void publishStatus();
+public:
+    // MQTTController();
+    MQTTController(
+        const char *v_,
+        LedshelfConfig &c_,
+        WiFiController &w_,
+        LightStateController &l_,
+        Effects &e_) : version(v_), config(c_), wifiCtrl(w_), lightState(l_), effects(e_){};
 
-    private:
-        String                  version;
-        PubSubClient            client;
-        WiFiController*         wifiCtrl;
-        LightStateController*   lightState;
-        LedshelfConfig*         config;
-        Effects*                effects;
+    void setup();
+    void checkConnection();
+    void publishInformation(const char *message);
+    void publishInformationData();
+    void publishStatus();
 
-
-        void publishState();
-        void handleNewState(LightState& state);
-        void handleUpdate();
-        void callback(char* p_topic, byte* p_message, unsigned int p_length);
-        void connect();
+private:
+    void publishState();
+    void handleNewState(LightState &state);
+    void handleUpdate();
+    void callback(char *p_topic, byte *p_message, unsigned int p_length);
+    void connect();
 };
 
 #endif // MQTTController_h
