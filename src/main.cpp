@@ -25,7 +25,7 @@
 
 FASTLED_USING_NAMESPACE
 
-static const char *VERSION = "v0.4.1";
+static const char *VERSION = "v0.5.0";
 
 // Fastled definitions
 static const uint8_t GPIO_DATA = 18;
