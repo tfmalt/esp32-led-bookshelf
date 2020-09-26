@@ -32,7 +32,7 @@ static const uint8_t GPIO_DATA = 18;
 
 // 130 bed lights
 // 384 shelf lights
-static const uint16_t NUM_LEDS = 256;
+static const uint16_t NUM_LEDS = 128;
 static const uint8_t FPS = 60;
 static const uint8_t FASTLED_SHOW_CORE = 0;
 
@@ -47,7 +47,7 @@ static const uint8_t FASTLED_SHOW_CORE = 0;
 CRGBArray<NUM_LEDS> leds;
 LedshelfConfig config;           // read from json config file.
 LightStateController lightState; // Own object. Responsible for state.
-WiFiController wifiCtrl;
+WiFiController wifiCtrl(config);
 Effects effects;
 MQTTController mqttCtrl(VERSION, config, wifiCtrl, lightState, effects);
 
@@ -107,7 +107,7 @@ void setupFastLED()
 {
     Serial.println("Setting up LED");
     Serial.printf("  - number of leds: %i\n", NUM_LEDS);
-    Serial.printf("  - maximum milliamps: %i\n", config.milliamps);
+    Serial.printf("  - maximum milliamps: %i\n", config.fastled_milliamps);
 
     lightState.initialize();
     LightState &currentState = lightState.getCurrentState();
@@ -115,7 +115,7 @@ void setupFastLED()
     Serial.printf("  - state is: '%s'\n", currentState.state ? "On" : "Off");
 
     FastLED.addLeds<WS2812B, GPIO_DATA, GRB>(leds, NUM_LEDS).setCorrection(UncorrectedColor);
-    FastLED.setMaxPowerInVoltsAndMilliamps(5, config.milliamps);
+    FastLED.setMaxPowerInVoltsAndMilliamps(5, config.fastled_milliamps);
     FastLED.setBrightness(currentState.state ? currentState.brightness : 0);
 
     effects.setFPS(FPS);
@@ -138,7 +138,7 @@ void setupFastLED()
 void setupArduinoOTA()
 {
     ArduinoOTA.setPort(3232);
-    ArduinoOTA.setPassword(config.password.c_str());
+    ArduinoOTA.setPassword(config.mqtt_password);
     ArduinoOTA
         .onStart([]() {
             // U_FLASH or U_SPIFFS
@@ -183,10 +183,9 @@ void setup()
     Serial.printf("Starting version %s...\n", VERSION);
 
     config.setup();
-    wifiCtrl.setup(config);
-    mqttCtrl.setup();
-
+    wifiCtrl.setup();
     wifiCtrl.connect();
+    mqttCtrl.setup();
 
     setupArduinoOTA();
 
