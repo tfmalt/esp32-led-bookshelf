@@ -267,8 +267,8 @@ void MQTTController::connect()
     while (!client.connected())
     {
         Serial.printf(
-            "Attempting MQTT connection to \"%s\" \"%i\" as \"%s\" ...\n",
-            config.mqtt_server, config.mqtt_port, config.mqtt_username);
+            "Attempting MQTT connection to \"%s\" \"%i\" as \"%s\":\"%s\" ...\n",
+            config.mqtt_server, config.mqtt_port, config.mqtt_username, config.mqtt_password);
 
         Serial.printf("  - statusTopic: %s\n", statusTopic);
 
@@ -278,7 +278,7 @@ void MQTTController::connect()
         //         config.mqtt_password,
         //         statusTopic,
         //         0, true, "Disconnected"))
-        if (client.connect(config.mqtt_client))
+        if (client.connect(config.mqtt_client, config.mqtt_username, config.mqtt_password, statusTopic, 0, true, "Disconnected"))
         {
             Serial.println(" connected");
             Serial.printf("  - status:  '%s'\n", statusTopic);

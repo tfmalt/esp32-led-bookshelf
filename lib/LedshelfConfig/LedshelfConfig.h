@@ -13,12 +13,12 @@ public:
     void setup();
 
     char ca_root[1680];
-    char wifi_ssid[32];
-    char wifi_psk[32];
+    char wifi_ssid[64];
+    char wifi_psk[64];
     char mqtt_server[32];
     uint16_t mqtt_port;
     char mqtt_username[32];
-    char mqtt_password[32];
+    char mqtt_password[64];
     bool mqtt_ssl;
     char mqtt_client[32];
     char mqtt_command_topic[16];
