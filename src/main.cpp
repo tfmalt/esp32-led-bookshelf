@@ -48,19 +48,33 @@ uint16_t commandFrameCount = 0;
 ulong commandStart = 0;
 uint8_t updateProgress = 0;
 
+//
+// Function that does the actual fast led setup on start. run by arduino setup
+// function
 void setupFastLED() {
   Serial.println("Setting up LED");
   Serial.printf("  - number of leds: %i\n", NUM_LEDS);
   Serial.printf("  - maximum milliamps: %i\n", config.fastled_milliamps);
 
+#ifdef GPIO_CLOCK
+  Serial.printf("  - type: SK9822, data: %i, clock: %i.\n", GPIO_DATA,
+                GPIO_CLOCK);
+  FastLED
+      .addLeds<LED_TYPE, GPIO_DATA, GPIO_CLOCK, LED_COLOR_ORDER,
+               DATA_RATE_MHZ(12)>(leds, NUM_LEDS)
+      .setCorrection(TypicalSMD5050);
+#else
+  Serial.printf("  - type: WS2812B, data: %i\n", GPIO_DATA);
+  FastLED.addLeds<LED_TYPE, GPIO_DATA, LED_COLOR_ORDER>(leds, NUM_LEDS)
+      .setCorrection(TypicalSMD5050);
+#endif
+
+  FastLED.setMaxPowerInVoltsAndMilliamps(5, config.fastled_milliamps);
+
   lightState.initialize();
   LightState &currentState = lightState.getCurrentState();
 
   Serial.printf("  - state is: '%s'\n", currentState.state ? "On" : "Off");
-
-  FastLED.addLeds<LED_TYPE, GPIO_DATA, LED_COLOR_ORDER>(leds, NUM_LEDS)
-      .setCorrection(UncorrectedColor);
-  FastLED.setMaxPowerInVoltsAndMilliamps(5, config.fastled_milliamps);
   FastLED.setBrightness(currentState.state ? currentState.brightness : 0);
 
   // effects.setFPS(FPS);
