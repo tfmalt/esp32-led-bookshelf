@@ -13,35 +13,37 @@
  * Copyright (c) 2018-2020 Thomas Malt
  */
 
-// #include <debug.h>
 #include <Arduino.h>
 #include <ArduinoOTA.h>
 #include <Effects.h>
 #include <FastLED.h>
 #include <LedshelfConfig.h>
 #include <LightStateController.h>
+// #include <MD_MSGEQ7.h>
 #include <MQTTController.h>
 #include <WiFiController.h>
+#include <arduinoFFT.h>
+
+#define SAMPLES 1024
+#define SAMPLING_FREQUENCY 40000
+#define AMPLITUDE 150
+
+// byte peak[] = {0, 0, 0, 0, 0, 0, 0, 0};
+double vReal[SAMPLES];
+double vImag[SAMPLES];
+// unsigned long newTime, oldTime;
+// int dominant_value;
 
 FASTLED_USING_NAMESPACE
 
-// Fastled definitions
-// static const uint8_t GPIO_DATA = 18;
-
-// 130 bed lights
-// 384 shelf lights
-// static const uint16_t NUM_LEDS = 128;
-// static const uint8_t FPS = 60;
-// static const uint8_t FASTLED_SHOW_CORE = 0;
-
 // global objects
 CRGBArray<NUM_LEDS> leds;
-
-LedshelfConfig config;            // read from json config file.
-LightStateController lightState;  // Own object. Responsible for state.
+LedshelfConfig config;
+LightStateController lightState;
 Effects effects;
 WiFiController wifiCtrl(config);
 MQTTController mqttCtrl(VERSION, config, wifiCtrl, lightState, effects);
+arduinoFFT FFT = arduinoFFT();
 
 uint16_t commandFrames = FPS;
 uint16_t commandFrameCount = 0;
@@ -52,29 +54,37 @@ uint8_t updateProgress = 0;
 // Function that does the actual fast led setup on start. run by arduino setup
 // function
 void setupFastLED() {
+#ifdef DEBUG
   Serial.println("Setting up LED");
-  Serial.printf("  - number of leds: %i\n", NUM_LEDS);
-  Serial.printf("  - maximum milliamps: %i\n", config.fastled_milliamps);
+  Serial.printf("  - number of leds: %i, max mA: %i\n", NUM_LEDS, LED_mA);
+#endif
 
-#ifdef GPIO_CLOCK
-  Serial.printf("  - type: SK9822, data: %i, clock: %i.\n", GPIO_DATA,
-                GPIO_CLOCK);
+#ifdef LED_CLOCK
+#ifdef DEBUG
+  Serial.printf("  - type: SK9822, data: %i, clock: %i.\n", LED_DATA,
+                LED_CLOCK);
+#endif
+
   FastLED
-      .addLeds<LED_TYPE, GPIO_DATA, GPIO_CLOCK, LED_COLOR_ORDER,
+      .addLeds<LED_TYPE, LED_DATA, LED_CLOCK, LED_COLOR_ORDER,
                DATA_RATE_MHZ(12)>(leds, NUM_LEDS)
       .setCorrection(TypicalSMD5050);
 #else
-  Serial.printf("  - type: WS2812B, data: %i\n", GPIO_DATA);
-  FastLED.addLeds<LED_TYPE, GPIO_DATA, LED_COLOR_ORDER>(leds, NUM_LEDS)
+#ifdef DEBUG
+  Serial.printf("  - type: WS2812B, data: %i\n", LED_DATA);
+#endif
+  FastLED.addLeds<LED_TYPE, LED_DATA, LED_COLOR_ORDER>(leds, NUM_LEDS)
       .setCorrection(TypicalSMD5050);
 #endif
 
-  FastLED.setMaxPowerInVoltsAndMilliamps(5, config.fastled_milliamps);
+  FastLED.setMaxPowerInVoltsAndMilliamps(5, LED_mA);
 
   lightState.initialize();
   LightState &currentState = lightState.getCurrentState();
 
+#ifdef DEBUG
   Serial.printf("  - state is: '%s'\n", currentState.state ? "On" : "Off");
+#endif
   FastLED.setBrightness(currentState.state ? currentState.brightness : 0);
 
   // effects.setFPS(FPS);
@@ -98,7 +108,9 @@ void setupArduinoOTA() {
       })
       .onEnd([]() { mqttCtrl.publishInformation("Finished"); })
       .onError([](ota_error_t error) {
+#ifdef DEBUG
         Serial.printf("Error[%u]: ", error);
+#endif
         String errmsg;
         switch (error) {
           case OTA_AUTH_ERROR:
@@ -125,9 +137,14 @@ void setupArduinoOTA() {
       });
 }
 
+/* ======================================================================
+ * SETUP
+ */
 void setup() {
+#ifdef DEBUG
   Serial.begin(115200);
   Serial.printf("Starting version %s...\n", VERSION);
+#endif
 
   config.setup();
   wifiCtrl.setup();
@@ -154,10 +171,30 @@ void loop() {
     effects.runCurrentCommand();
     effects.runCurrentEffect();
 
-    EVERY_N_SECONDS(60) {
+    EVERY_N_SECONDS(300) {
       mqttCtrl.publishStatus();
       mqttCtrl.publishInformationData();
     }
+
+    // for (int i = 0; i < SAMPLES; i++) {
+    //   vReal[i] = analogRead(FTT_AUDIO);
+    //   vImag[i] = 0;
+    //   // Serial.println(vReal[i]);
+    // }
+    //
+    //     // FFT
+    //     FFT.Windowing(vReal, SAMPLES, FFT_WIN_TYP_HAMMING, FFT_FORWARD);
+    //     FFT.Compute(vReal, vImag, SAMPLES, FFT_FORWARD);
+    //     FFT.ComplexToMagnitude(vReal, vImag, SAMPLES);
+
+    // for (int i = 2; i < (SAMPLES / 2); i++) {
+    //   vReal[i] = constrain(vReal[i], 0, 65535);
+    //   vReal[i] = map(vReal[i], 0, 65535, 0, 8);
+    //   if (i <= 2) Serial.printf("%i\t", (uint16_t)vReal[i]);
+    //   if (i > 2 && i <= 4) Serial.printf("%i\t", (uint16_t)vReal[i]);
+    // }
+    // Serial.printf("\n");
+
     // fastLEDshowESP32();
     FastLED.show();
     delay(1000 / FPS);

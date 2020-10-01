@@ -27,7 +27,6 @@ class LedshelfConfig {
   char mqtt_information_topic[16];
   char mqtt_update_topic[16];
   uint16_t fastled_num_leds;
-  uint16_t fastled_milliamps;
 
   LedshelfConfig(){};
 
@@ -78,7 +77,9 @@ class LedshelfConfig {
 
  private:
   void parseConfigFile() {
+#ifdef DEBUG
     Serial.printf("  - Parsing config file: %s ... ", CONFIG_FILE);
+#endif
 
     File file = SPIFFS.open(CONFIG_FILE, "r");
 
@@ -116,9 +117,10 @@ class LedshelfConfig {
             sizeof(mqtt_information_topic));
     strlcpy(mqtt_update_topic, config["mqtt"]["topics"]["update"] | "",
             sizeof(mqtt_update_topic));
-    fastled_milliamps = config["fastled"]["milliamps"] | 0;
 
+#ifdef DEBUG
     Serial.println("Done");
+#endif
   }
 
   /**

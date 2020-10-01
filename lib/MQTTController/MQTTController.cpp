@@ -20,8 +20,10 @@ NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", 3600, 60000);
 // }
 
 void MQTTController::setup() {
+#ifdef DEBUG
   Serial.printf("Setting up MQTT Client: %s %i\n", config.mqtt_server,
                 config.mqtt_port);
+#endif
 
   config.statusTopic(statusTopic);
   config.commandTopic(commandTopic);
@@ -31,10 +33,14 @@ void MQTTController::setup() {
   config.informationTopic(informationTopic);
 
   timeClient.begin();
+#ifdef DEBUG
   Serial.println("NTP time client started.");
+#endif
 
   WiFiClient &wifi = wifiCtrl.getWiFiClient();
+#ifdef DEBUG
   Serial.println("Got wifi client");
+#endif
 
   client.setClient(wifi);
   client.setServer(config.mqtt_server, config.mqtt_port);
@@ -46,13 +52,17 @@ void MQTTController::setup() {
 
 void MQTTController::checkConnection() {
   if (WiFi.status() != WL_CONNECTED) {
+#ifdef DEBUG
     Serial.println("Restarting because WiFI not connected.");
+#endif
     // delay(5000);
     ESP.restart();
     return;
   }
   if (!client.connected()) {
+#ifdef DEBUG
     Serial.printf("MQTT broker not connected: %s\n", config.mqtt_server);
+#endif
     connect();
   }
 
@@ -91,7 +101,9 @@ void MQTTController::publishInformationData() {
  */
 void MQTTController::callback(char *p_topic, byte *p_message,
                               unsigned int p_length) {
+#ifdef DEBUG
   Serial.printf("- MQTT Got topic: '%s'\n", p_topic);
+#endif
   if (effects.currentCommandType == Effects::Command::FirmwareUpdate) {
     publishInformation("Firmware update active. Ignoring command.");
     return;
@@ -108,8 +120,9 @@ void MQTTController::callback(char *p_topic, byte *p_message,
     handleUpdate();
     return;
   }
-
+#ifdef DEBUG
   Serial.printf("- ERROR: Not a valid topic: '%s'. IGNORING\n", p_topic);
+#endif
   return;
 }
 // End of MQTT Callback
@@ -120,33 +133,46 @@ void MQTTController::callback(char *p_topic, byte *p_message,
  */
 void MQTTController::handleNewState(LightState &state) {
   if (state.state == false) {
+#ifdef DEBUG
     Serial.println("- Told to turn off");
+#endif
     FastLED.setBrightness(0);
     return;
   }
 
   if (state.status.hasBrightness) {
+#ifdef DEBUG
     Serial.printf("- Got new brightness: '%i'\n", state.brightness);
+#endif
     effects.setCurrentCommand(Effects::Command::Brightness);
   } else if (state.status.hasColor) {
+#ifdef DEBUG
     Serial.println("  - Got color");
+#endif
     if (effects.getCurrentEffect() == Effects::Effect::NullEffect) {
       effects.setCurrentCommand(Effects::Command::Color);
     } else {
+#ifdef DEBUG
       Serial.printf("    - Effect is: '%s' hue: %.2f\n", state.effect.c_str(),
                     state.color.h);
+#endif
       effects.setStartHue(state.color.h);
     }
   } else if (state.status.hasEffect) {
-    Serial.printf("  - Got effect '%s'. Setting it.\n", state.effect.c_str());
+#ifdef DEBUG
+    Serial.printf("  - MQTT: Got effect '%s'. Setting it.\n",
+                  state.effect.c_str());
+#endif
     effects.setCurrentEffect(state.effect);
     if (state.effect == "") {
       effects.setCurrentCommand(Effects::Command::Color);
     }
   } else if (state.status.hasColorTemp) {
     unsigned int kelvin = (1000000 / state.color_temp);
+#ifdef DEBUG
     Serial.printf("  - Got color temp: %i mired = %i Kelvin\n",
                   state.color_temp, kelvin);
+#endif
 
     unsigned int temp = kelvin / 100;
 
@@ -187,8 +213,10 @@ void MQTTController::handleNewState(LightState &state) {
       }
     }
 
+#ifdef DEBUG
     Serial.printf("    - RGB [%i, %i, %i]\n", static_cast<uint8_t>(red),
                   static_cast<uint8_t>(green), static_cast<uint8_t>(blue));
+#endif
     state.color.r = static_cast<uint8_t>(red);
     state.color.g = static_cast<uint8_t>(green);
     state.color.b = static_cast<uint8_t>(blue);
@@ -203,7 +231,9 @@ void MQTTController::handleNewState(LightState &state) {
 void MQTTController::handleUpdate() {
   publishInformation(
       "Got update notification. Getting ready to perform firmware update.");
+#ifdef DEBUG
   Serial.println("Running ArduinoOTA");
+#endif
   ArduinoOTA.begin();
 
   effects.setCurrentEffect(Effects::Effect::NullEffect);
@@ -216,27 +246,27 @@ void MQTTController::connect() {
   IPAddress mqttip;
   WiFi.hostByName(config.mqtt_server, mqttip);
 
+#ifdef DEBUG
   Serial.printf("  - %s = ", config.mqtt_server);
   Serial.println(mqttip);
+#endif
 
   while (!client.connected()) {
+#ifdef DEBUG
     Serial.printf(
         "Attempting MQTT connection to \"%s\" \"%i\" as \"%s\":\"%s\" ...",
         config.mqtt_server, config.mqtt_port, config.mqtt_username,
         config.mqtt_password);
+#endif
 
-    // if (client.connect(
-    //         config.mqtt_client,
-    //         config.mqtt_username,
-    //         config.mqtt_password,
-    //         statusTopic,
-    //         0, true, "Disconnected"))
     if (client.connect(config.mqtt_client, config.mqtt_username,
                        config.mqtt_password, statusTopic, 0, true,
                        "Disconnected")) {
+#ifdef DEBUG
       Serial.println(" connected");
       Serial.printf("  - state:  '%s'\n", stateTopic);
       Serial.printf("  - command: '%s'\n", commandTopic);
+#endif
 
       timeClient.update();
 
@@ -247,8 +277,10 @@ void MQTTController::connect() {
       publishStatus();
       publishInformationData();
     } else {
+#ifdef DEBUG
       Serial.print(" failed: ");
       Serial.println(client.state());
+#endif
       delay(5000);
     }
   }
