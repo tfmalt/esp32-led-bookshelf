@@ -34,6 +34,7 @@ class Effects {
   void effectRainbow();
   void effectRainbowByShelf();
   void effectBPM();
+  void effectEqualizer();
   void effectConfetti();
   void effectSinelon();
   void effectJuggle();
@@ -48,10 +49,12 @@ class Effects {
     RainbowByShelf,
     Juggle,
     Sinelon,
+    Equalizer,
     NullEffect,
     EmptyEffect,
     NoEffect
   };
+
   Command currentCommandType;
   Effect currentEffectType;
   ulong commandStart = 0;

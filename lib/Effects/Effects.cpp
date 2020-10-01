@@ -46,6 +46,9 @@ void Effects::setCurrentCommand(Command cmd) {
 }
 
 void Effects::setCurrentEffect(String effect) {
+#ifdef DEBUG
+  Serial.printf("  - Effects: Setting new effect: %s\n", effect);
+#endif
   setCurrentEffect(getEffectFromString(effect));
 }
 
@@ -57,6 +60,7 @@ Effects::Effect Effects::getEffectFromString(String str) {
   if (str == "Confetti") return Effect::Confetti;
   if (str == "Juggle") return Effect::Juggle;
   if (str == "Sinelon") return Effect::Sinelon;
+  if (str == "Equalizer") return Effect::Equalizer;
 
   return Effect::NullEffect;
 }
@@ -77,6 +81,9 @@ void Effects::setCurrentEffect(Effect effect) {
       break;
     case Effect::BPM:
       currentEffect = &Effects::effectBPM;
+      break;
+    case Effect::Equalizer:
+      currentEffect = &Effects::effectEqualizer;
       break;
     case Effect::Confetti:
       currentEffect = &Effects::effectConfetti;
@@ -121,8 +128,10 @@ void Effects::cmdSetBrightness() {
         current + ((target - current) / (commandFrames - commandFrameCount)));
     commandFrameCount++;
   } else {
+#ifdef DEBUG
     Serial.printf("  - command: setting brightness DONE [%i] %lu ms.\n",
                   FastLED.getBrightness(), (millis() - commandStart));
+#endif
 
     setCurrentCommand(Command::None);
   }
@@ -176,9 +185,10 @@ void Effects::fadeTowardColor(CRGB* L, uint16_t N, const CRGB& bgColor,
   }
 
   if (check == numberOfLeds) {
-    // currentCommand = cmdEmpty;
+#ifdef DEBUG
     Serial.printf("  - fade towards color done in %lu ms.\n",
                   (millis() - commandStart));
+#endif
     setCurrentCommand(Command::None);
   }
 }
@@ -257,6 +267,11 @@ void Effects::effectBPM() {
                                beat - startHue + (i * 10));
   }
 }
+
+/**
+ * FFT based spectrum analyzer disco lights
+ */
+void Effects::effectEqualizer() { Serial.println("Running effect equalizer"); }
 
 /**
  * eight colored dots, weaving in and out of sync with each other
