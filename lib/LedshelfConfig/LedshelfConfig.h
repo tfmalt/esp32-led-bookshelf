@@ -26,7 +26,7 @@ class LedshelfConfig {
   char mqtt_query_topic[16];
   char mqtt_information_topic[16];
   char mqtt_update_topic[16];
-  uint16_t fastled_num_leds;
+  uint16_t fastled_LED_COUNT;
 
   LedshelfConfig(){};
 

@@ -1,6 +1,16 @@
 
 #include "Effects.h"
-// #include <FastLED.h>
+
+// #define FFT_SAMPLES 1024
+// #define FFT_BUCKETS 8
+// #define EQ_SEGMENT 8
+
+arduinoFFT FFT = arduinoFFT();
+
+double vReal[FFT_SAMPLES];
+double vImag[FFT_SAMPLES];
+int buckets[FFT_BUCKETS] = {0};
+int segment = LED_COUNT / FFT_BUCKETS;
 
 Effects::Effects() {
   currentCommand = &Effects::cmdEmpty;
@@ -9,11 +19,6 @@ Effects::Effects() {
   currentCommandType = Command::None;
   currentEffectType = Effect::NullEffect;
 }
-
-// void Effects::setFPS(uint8_t f)
-// {
-//     FPS = f;
-// }
 
 void Effects::setLightStateController(LightStateController* l) {
   lightState = l;
@@ -268,10 +273,81 @@ void Effects::effectBPM() {
   }
 }
 
+#define SAMPLING_FREQUENCY 40000
+unsigned long newtime;
+unsigned long oldtime;
+unsigned long sampling_period = round(1000000 * (1.0 / SAMPLING_FREQUENCY));
+
 /**
  * FFT based spectrum analyzer disco lights
  */
-void Effects::effectEqualizer() { Serial.println("Running effect equalizer"); }
+void Effects::effectEqualizer() {
+  CRGBSet ledset(leds, numberOfLeds);
+
+  ledset(0, FFT_BUCKETS * segment) = CRGB::Black;
+
+  // Serial.println("Running effect equalizer");
+  for (int i = 0; i < FFT_SAMPLES; i++) {
+    newtime = micros() - oldtime;
+    oldtime = newtime;
+
+    vReal[i] = analogRead(FFT_INPUT_PIN);
+    vImag[i] = 0;
+
+    while (micros() < (newtime + sampling_period)) {
+    }
+  }
+
+  // FFT
+  FFT.Windowing(vReal, FFT_SAMPLES, FFT_WIN_TYP_HAMMING, FFT_FORWARD);
+  FFT.Compute(vReal, vImag, FFT_SAMPLES, FFT_FORWARD);
+  FFT.ComplexToMagnitude(vReal, vImag, FFT_SAMPLES);
+
+  for (int i = 2; i < (FFT_SAMPLES / 2); i++) {
+    vReal[i] = constrain(vReal[i], 0, 65535);
+    vReal[i] = map(vReal[i], 0, 65535, 0, 255);
+    if (i > 1 && i <= 3) {
+      buckets[0] = (vReal[i] > buckets[0]) ? (uint8_t)vReal[i] : buckets[0];
+    }
+    if (i > 5 && i <= 6) {
+      buckets[1] = (vReal[i] > buckets[1]) ? (uint8_t)vReal[i] : buckets[1];
+    }
+    if (i > 6 && i <= 9) {
+      buckets[2] = (vReal[i] > buckets[2]) ? (uint8_t)vReal[i] : buckets[2];
+    }
+    if (i > 9 && i <= 15) {
+      buckets[3] = (vReal[i] > buckets[3]) ? (uint8_t)vReal[i] : buckets[3];
+    }
+    if (i > 15 && i <= 40) {
+      buckets[4] = (vReal[i] > buckets[4]) ? (uint8_t)vReal[i] : buckets[4];
+    }
+    if (i > 40 && i <= 70) {
+      buckets[5] = (vReal[i] > buckets[5]) ? (uint8_t)vReal[i] : buckets[5];
+    }
+    if (i > 70 && i <= 288) {
+      buckets[6] = (vReal[i] > buckets[6]) ? (uint8_t)vReal[i] : buckets[6];
+    }
+    if (i > 288) {
+      buckets[7] = (vReal[i] > buckets[7]) ? (uint8_t)vReal[i] : buckets[7];
+    }
+  }
+
+  uint32_t colors[FFT_BUCKETS] = {
+      CRGB::Red,  CRGB::OrangeRed, CRGB::Orange, CRGB::Green,
+      CRGB::Aqua, CRGB::Blue,      CRGB::Violet, CRGB::MediumVioletRed};
+
+  for (int i = 0; i < FFT_BUCKETS; i++) {
+    Serial.printf("%i\t", buckets[i]);
+    if (buckets[i] < 127) {
+      ledset(i * segment, (i * segment) + segment).fadeToBlackBy(2);
+    } else {
+      ledset(i * segment, (i * segment) + segment) = colors[i];
+      ledset(i * segment, (i * segment) + segment).nscale8(buckets[i]);
+    }
+    buckets[i] = 0;
+  }
+  Serial.printf("\n");
+}
 
 /**
  * eight colored dots, weaving in and out of sync with each other

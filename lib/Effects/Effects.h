@@ -5,6 +5,7 @@
 #include <ArduinoOTA.h>
 #include <FastLED.h>
 #include <LightStateController.h>
+#include <arduinoFFT.h>
 
 class Effects {
  private:
@@ -14,8 +15,7 @@ class Effects {
   LightStateController *lightState;
   CRGB *leds;
 
-  // uint8_t                 FPS                 = 0;
-  uint16_t numberOfLeds = NUM_LEDS;
+  uint16_t numberOfLeds = LED_COUNT;
   uint8_t startHue = 0;
   uint16_t commandFrameCount = 0;
   uint16_t commandFrames = 0;
