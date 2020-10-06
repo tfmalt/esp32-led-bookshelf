@@ -5,7 +5,14 @@
 #include <ArduinoOTA.h>
 #include <FastLED.h>
 #include <LightStateController.h>
+
+#ifdef FFT_ACTIVE
 #include <arduinoFFT.h>
+#endif
+
+#ifdef MSG_ACTIVE
+#include <MD_MSGEQ7.h>
+#endif
 
 class Effects {
  private:
@@ -17,9 +24,13 @@ class Effects {
 
   uint16_t numberOfLeds = LED_COUNT;
   uint8_t startHue = 0;
+  uint8_t confettiHue = 0;
   uint16_t commandFrameCount = 0;
   uint16_t commandFrames = 0;
 
+  unsigned long sampleDelay();
+  void fftComputeSampleset();
+  void fftFillBuckets();
   void cmdEmpty();
   void cmdSetBrightness();
   void cmdFadeTowardColor();
@@ -30,14 +41,17 @@ class Effects {
   CRGB fadeTowardColor(CRGB &cur, const CRGB &target, uint8_t amount);
   void nblendU8TowardU8(uint8_t &cur, const uint8_t target, uint8_t amount);
   void addGlitter(fract8 chanceOfGlitter);
+
   void effectGlitterRainbow();
   void effectRainbow();
   void effectRainbowByShelf();
   void effectBPM();
-  void effectEqualizer();
+  void effectVUMeter();
   void effectConfetti();
   void effectSinelon();
   void effectJuggle();
+  void effectFrequencies();
+  void effectMSGSerial();
 
  public:
   enum Command { Null, None, Empty, Brightness, Color, FirmwareUpdate };
@@ -49,7 +63,9 @@ class Effects {
     RainbowByShelf,
     Juggle,
     Sinelon,
-    Equalizer,
+    VUMeter,
+    Frequencies,
+    MSGSerial,
     NullEffect,
     EmptyEffect,
     NoEffect

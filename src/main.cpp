@@ -19,10 +19,8 @@
 #include <FastLED.h>
 #include <LedshelfConfig.h>
 #include <LightStateController.h>
-// #include <MD_MSGEQ7.h>
 #include <MQTTController.h>
 #include <WiFiController.h>
-#include <arduinoFFT.h>
 
 FASTLED_USING_NAMESPACE
 
@@ -39,9 +37,8 @@ uint16_t commandFrameCount = 0;
 ulong commandStart = 0;
 uint8_t updateProgress = 0;
 
-//
-// Function that does the actual fast led setup on start. run by arduino setup
-// function
+// Function that does the actual fast led setup on start.
+// Run by arduino setup function.
 void setupFastLED() {
 #ifdef DEBUG
   Serial.println("Setting up LED");
@@ -67,6 +64,7 @@ void setupFastLED() {
 #endif
 
   FastLED.setMaxPowerInVoltsAndMilliamps(5, LED_mA);
+  FastLED.countFPS(FPS);
 
   lightState.initialize();
   LightState &currentState = lightState.getCurrentState();
@@ -82,6 +80,7 @@ void setupFastLED() {
   effects.setCurrentEffect(currentState.effect);
   effects.setStartHue(currentState.color.h);
 }
+// END OF setupFastLED
 
 void setupArduinoOTA() {
   ArduinoOTA.setPort(3232);
@@ -128,6 +127,7 @@ void setupArduinoOTA() {
 
 /* ======================================================================
  * SETUP
+ * ======================================================================
  */
 void setup() {
 #ifdef DEBUG
@@ -142,10 +142,17 @@ void setup() {
 
   setupArduinoOTA();
 
-  delay(3000);
+  delay(2000);
 
   setupFastLED();
 }
+
+/* ======================================================================
+ * LOOP
+ * ======================================================================
+ */
+unsigned long timetowait = 1000 / FPS;
+unsigned long previoustime = 0;
 
 void loop() {
   mqttCtrl.checkConnection();
@@ -160,12 +167,16 @@ void loop() {
     effects.runCurrentCommand();
     effects.runCurrentEffect();
 
+    EVERY_N_MILLIS(timetowait) { FastLED.show(); }
+
+    EVERY_N_SECONDS(2) {
+      Serial.print("FPS: ");
+      Serial.println(FastLED.getFPS());
+    }
+
     EVERY_N_SECONDS(300) {
       mqttCtrl.publishStatus();
       mqttCtrl.publishInformationData();
     }
-
-    FastLED.show();
-    delay(1000 / FPS);
   }
 }
