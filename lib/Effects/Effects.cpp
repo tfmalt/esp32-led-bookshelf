@@ -3,6 +3,8 @@
 
 #ifdef FFT_ACTIVE
 #define SAMPLING_FREQUENCY 40000
+#define FFT_SAMPLES 1024
+#define FFT_BUCKETS 7
 double vReal[FFT_SAMPLES];
 double vImag[FFT_SAMPLES];
 
@@ -12,9 +14,6 @@ int segment = LED_COUNT / FFT_BUCKETS;
 arduinoFFT FFT = arduinoFFT();
 #endif
 
-#ifdef MSG_ACTIVE
-MD_MSGEQ7 MSGEQ7(MSG_RESET, MSG_STROBE, MSG_DATA);
-#endif
 // Gradient palette "Paired_07_gp", originally from
 // http://soliton.vm.bytemark.co.uk/pub/cpt-city/cb/qual/tn/Paired_07.png.index.html
 // converted for FastLED with gammas (2.6, 2.2, 2.5)
@@ -33,8 +32,6 @@ Effects::Effects() {
 
   currentCommandType = Command::None;
   currentEffectType = Effect::NullEffect;
-
-  MSGEQ7.begin();
 }
 
 void Effects::setLightStateController(LightStateController* l) {
@@ -85,6 +82,7 @@ Effects::Effect Effects::getEffectFromString(String str) {
   if (str == "VUMeter") return Effect::VUMeter;
   if (str == "Frequencies") return Effect::Frequencies;
   if (str == "MSGSerial") return Effect::MSGSerial;
+  if (str == "Music Dancer") return Effect::MusicDancer;
 
   return Effect::NullEffect;
 }
@@ -109,6 +107,9 @@ void Effects::setCurrentEffect(Effect effect) {
     case Effect::VUMeter:
       currentEffect = &Effects::effectVUMeter;
       break;
+    case Effect::MusicDancer:
+      currentEffect = &Effects::effectMusicDancer;
+      break;
     case Effect::Frequencies:
       currentEffect = &Effects::effectFrequencies;
       break;
@@ -120,9 +121,6 @@ void Effects::setCurrentEffect(Effect effect) {
       break;
     case Effect::Juggle:
       currentEffect = &Effects::effectJuggle;
-      break;
-    case Effect::MSGSerial:
-      currentEffect = &Effects::effectMSGSerial;
       break;
     default:
       currentEffectType = Effect::NullEffect;
@@ -274,152 +272,276 @@ void Effects::fftComputeSampleset() {
   // unsigned long doneCompute = micros();
 }
 
+void Effects::fftFillBucketsSimple() {
+  enum { PREV = 0, CURR = 1, NEXT = 2 };
+  int comp[3];
+
+  EVERY_N_MILLIS(1000) {
+    Serial.println();
+    Serial.printf("%6s\t", "curr");
+    for (int i = 2; i < 42; i++) {
+      Serial.printf("%6i\t", i);
+    }
+    Serial.println();
+    for (int i = 1; i < 42; i++) {
+      Serial.printf("------\t");
+    }
+    Serial.println();
+  }
+
+  for (int i = 2; i < FFT_SAMPLES / 2; i++) {
+    if (i == 2) {
+      // Bass: 50 - 250 Hz
+      comp[CURR] = (int)vReal[2];
+      comp[NEXT] = (int)vReal[3];
+
+      if (comp[CURR] < comp[NEXT]) comp[CURR] = 0;
+
+      comp[CURR] = constrain(comp[CURR], 0, 48000);
+      // Serial.printf("%6i\t", comp[CURR]);
+      buckets[0] = (uint8_t)map(comp[CURR], 0, 48000, 0, 255);
+
+      comp[CURR] = 0;
+    }
+    if (i > 2 && i < 4) {
+      // Low Midrange: 250 - 500 Hz
+      comp[CURR] = max(comp[CURR], (int)vReal[i]);
+    }
+
+    if (i == 4) {
+      comp[PREV] = (int)vReal[2];
+      comp[NEXT] = (int)vReal[6];
+
+      if (comp[CURR] < comp[PREV]) comp[CURR] = 0;
+      if (comp[CURR] < comp[NEXT]) comp[CURR] = 0;
+
+      Serial.printf("%6i\t", comp[CURR]);
+      comp[CURR] = constrain(comp[CURR], 0, 44000);
+      buckets[1] = (uint8_t)map(comp[CURR], 0, 44000, 0, 255);
+    }
+
+    if (i < 42) {
+      Serial.printf("%6i\t", (int)vReal[i]);
+    }
+  }
+  Serial.println();
+}
+
 void Effects::fftFillBuckets() {
-  int maxabove = 0;
-  int maxbelow = 0;
-  int maxval = 0;
+  int next = 0;
+  int prev = 0;
+  int curr = 0;
 
   // ====================================================================
   // 0: Bass: 60 - 250 Hz
-  maxval = max((int)vReal[2], maxval);
-  maxabove = (int)vReal[6];
+  curr = (int)vReal[2];
+  next = (int)vReal[3];
 
-  if (maxabove >= (maxval * 0.33)) maxval = 0;
+  //   Serial.printf("%7i\t", (int)vReal[2]);
 
-  maxval = constrain(maxval, 0, 16383);
-  maxval = map(maxval, 0, 16383, 0, 255);
+  if (next > curr) curr = 0;
 
-  buckets[0] = (uint8_t)maxval;
+  // Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
+
+  curr = constrain(curr, 0, 48000);
+  curr = map(curr, 0, 48000, 0, 255);
+
+  buckets[0] = (uint8_t)curr;
 
   // ====================================================================
   // 1: Low midrange: 250 - 500 Hz
-  maxval = 0;
-  maxabove = 0;
-  maxbelow = 0;
+  curr = 0;
+  next = 0;
+  prev = (int)vReal[2];
 
-  for (int i = 5; i < 10; i++) {
-    maxval = max((int)vReal[i], maxval);
+  for (int i = 3; i < 6; i++) {
+    curr = max((int)vReal[i], curr);
   }
 
-  maxbelow = (int)vReal[2];
-
-  for (int i = 10; i < 20; i++) {
-    maxabove = max((int)vReal[i], maxabove);
+  for (int i = 6; i < 11; i++) {
+    next = max((int)vReal[i], next);
   }
 
-  if (maxabove > (maxval * 0.5)) maxval = 0;
-  if (maxbelow > (maxval * 1.5)) maxval = 0;
-  if (maxval < 6000) maxval = 0;  // remove noise from below.
+  if (prev > (curr * 1.08)) curr = 0;
+  if (next > (curr * 0.4)) curr = 0;
+  if (curr < 6000) curr = 0;  // remove noise from below.
 
-  maxval = constrain(maxval, 0, 16383);
-  maxval = map(maxval, 0, 16383, 0, 255);
-  buckets[1] = (uint8_t)maxval;
+  // Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
+  curr -= 8000;
+  if (curr < 0) curr = 0;
+
+  curr = constrain(curr, 0, 56000);
+  curr = map(curr, 0, 56000, 0, 255);
+  buckets[1] = (uint8_t)curr;
 
   // ====================================================================
   // 2: Midrange: 500 - 1 kHz
-  maxval = 0;
-  maxabove = 0;
-  maxbelow = 0;
+  prev = 0;
+  curr = 0;
+  next = 0;
 
-  for (int i = 3; i < 6; i++) {
-    maxbelow = max((int)vReal[i], maxbelow);
+  for (int i = 2; i < 6; i++) {
+    prev = max((int)vReal[i], prev);
   }
 
-  for (int i = 20; i < 40; i++) {
-    maxabove = (vReal[i] > maxabove) ? vReal[i] : maxabove;
+  for (int i = 6; i < 11; i++) {
+    curr = (vReal[i] > curr) ? vReal[i] : curr;
   }
 
-  for (int i = 10; i < 20; i++) {
-    maxval = (vReal[i] > maxval) ? vReal[i] : maxval;
+  for (int i = 11; i < 21; i++) {
+    next = (vReal[i] > next) ? vReal[i] : next;
   }
-  if (maxabove >= (maxval * 0.40)) maxval = 0;
-  if (maxbelow > (maxval * 1.95)) maxval = 0;
 
-  // maxval = maxval - 10000;
-  // if (maxval < 0) maxval = 0;
-  maxval = constrain(maxval, 0, 16383);
-  maxval = map(maxval, 0, 16383, 0, 255);
+  if (next > (curr * 0.36)) curr = 0;
+  if (prev > (curr * 2.68)) curr = 0;
 
-  buckets[2] = (uint8_t)maxval;
+  //   Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
+
+  curr = constrain(curr, 0, 32000);
+  curr = map(curr, 0, 32000, 0, 255);
+
+  buckets[2] = (uint8_t)curr;
 
   // ====================================================================
   // 3: Midrange: 1 - 2 kHz
-  maxval = 0;
-  maxabove = 0;
-  maxbelow = 0;
+  curr = 0;
+  next = 0;
+  prev = 0;
 
-  for (int i = 20; i < 40; i++) {
-    maxval = (vReal[i] > maxval) ? vReal[i] : maxval;
+  for (int i = 2; i < 11; i++) {
+    prev = max((int)vReal[i], prev);
   }
 
-  for (int i = 41; i < 80; i++) {
-    maxabove = (vReal[i] > maxabove) ? vReal[i] : maxabove;
+  for (int i = 11; i < 21; i++) {
+    curr = max((int)vReal[i], curr);
   }
-  if (maxabove >= (maxval * 0.4)) maxval = 0;
-  maxval -= 8000;
-  if (maxval < 0) maxval = 0;
 
-  maxval = constrain(maxval, 0, 12000);
-  maxval = map(maxval, 0, 12000, 0, 255);
+  for (int i = 21; i < 41; i++) {
+    next = max((int)vReal[i], next);
+  }
 
-  buckets[3] = (uint8_t)maxval;
+  if (next > (curr * 0.29)) curr = 0;
+  if (prev > (curr * 2.84)) curr = 0;
+
+  // Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
+
+  curr -= 8000;
+  if (curr < 0) curr = 0;
+
+  curr = constrain(curr, 0, 56000);
+  curr = map(curr, 0, 56000, 0, 255);
+
+  buckets[3] = (uint8_t)curr;
 
   // ====================================================================
   // 4: Upper Midrange: 2 - 4 kHz
-  maxval = 0;
-  maxabove = 0;
+  curr = 0;
+  next = 0;
 
-  for (int i = 40; i < 80; i++) {
-    maxval = (vReal[i] > maxval) ? vReal[i] : maxval;
+  for (int i = 11; i < 21; i++) {
+    prev = max((int)vReal[i], prev);
   }
 
-  for (int i = 80; i < 160; i++) {
-    maxabove = (vReal[i] > maxabove) ? vReal[i] : maxabove;
+  for (int i = 21; i < 40; i++) {
+    curr = max((int)vReal[i], curr);
   }
-  if (maxabove >= (maxval * 0.4)) maxval = 0;
-  maxval -= 8000;
-  if (maxval < 0) maxval = 0;
 
-  maxval = constrain(maxval, 0, 12000);
-  maxval = map(maxval, 0, 12000, 0, 255);
+  for (int i = 41; i < 80; i++) {
+    next = max((int)vReal[i], next);
+  }
 
-  buckets[4] = (uint8_t)maxval;
+  if (prev > (curr * 3.74)) curr = 0;
+  if (next > (curr * 0.30)) curr = 0;
+
+  // Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
+
+  curr -= 8000;
+  if (curr < 0) curr = 0;
+
+  curr = constrain(curr, 0, 56000);
+  curr = map(curr, 0, 56000, 0, 255);
+
+  buckets[4] = (uint8_t)curr;
 
   // ====================================================================
   //   // 5: precence: 4 - 6 kHz
-  maxval = 0;
-  for (int i = 80; i < 120; i++) {
-    maxval = (vReal[i] > maxval) ? vReal[i] : maxval;
+  curr = 0;
+  next = 0;
+
+  for (int i = 21; i < 40; i++) {
+    prev = max((int)vReal[i], prev);
   }
 
-  maxabove = 0;
-  for (int i = 120; i < 240; i++) {
-    maxabove = (vReal[i] > maxabove) ? vReal[i] : maxabove;
+  for (int i = 40; i < 60; i++) {
+    curr = max((int)vReal[i], curr);
   }
-  if (maxabove > (maxval * 0.4)) maxval = 0;
 
-  maxval -= 8000;
-  if (maxval < 0) maxval = 0;
+  for (int i = 60; i < 240; i++) {
+    next = max((int)vReal[i], next);
+  }
 
-  maxval = constrain(maxval, 0, 12000);
-  maxval = map(maxval, 0, 12000, 0, 255);
+  if (prev > (curr * 1.10)) curr = 0;
+  if (next > (curr * 0.86)) curr = 0;
 
-  buckets[5] = (uint8_t)maxval;
+  //   Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
+
+  curr -= 8000;
+  if (curr < 0) curr = 0;
+
+  curr = constrain(curr, 0, 56000);
+  curr = map(curr, 0, 56000, 0, 255);
+
+  buckets[5] = (uint8_t)curr;
 
   // ====================================================================
   // 6: Brilliance: 6 - 20 kHz kHz
-  maxval = 0;
-  for (int i = 120; i < 240; i++) {
-    maxval = (vReal[i] > maxval) ? vReal[i] : maxval;
+  curr = 0;
+  next = 0;
+
+  for (int i = 40; i < 60; i++) {
+    prev = max((int)vReal[i], prev);
   }
 
-  maxval = maxval - 10000;
-  if (maxval < 0) maxval = 0;
+  for (int i = 60; i < 240; i++) {
+    curr = max((int)vReal[i], curr);
+  }
 
-  maxval = constrain(maxval, 0, 9000);
-  maxval = map(maxval, 0, 9000, 0, 255);
+  if (prev > (curr * 1.30)) curr = 0;
 
-  buckets[6] = (uint8_t)maxval;
+  // Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
+
+  curr = curr - 8000;
+  if (curr < 0) curr = 0;
+
+  curr = constrain(curr, 0, 56000);
+  curr = map(curr, 0, 56000, 0, 255);
+
+  buckets[6] = (uint8_t)curr;
+
+  // ====================================================================
+  // Debug printing:
+  // int FROM = 60;
+  // int TO = 113;
+  // int MOD = 1;
+  //
+  //   for (int i = FROM; i < TO; i++) {
+  //     if (i % MOD == 0) Serial.printf("%6i\t", (int)vReal[i]);
+  //   }
+  //   Serial.println();
+  //
+  //   EVERY_N_MILLIS(1000) {
+  //     Serial.println();
+  //     Serial.printf("%6s\t%6s\t%6s\t", "prev", "curr", "next");
+  //
+  //     for (int i = FROM; i < TO; i++) {
+  //       if (i % MOD == 0) Serial.printf("%6i\t", i);
+  //     }
+  //     Serial.println();
+  //     for (int i = FROM; i < (TO + 3); i++) {
+  //       if (i % MOD == 0) Serial.printf("------\t");
+  //     }
+  //     Serial.println();
+  //   }
 }
 
 // =====================================================================
@@ -505,7 +627,7 @@ void Effects::effectVUMeter() {
     // Serial.print(micros());
     // Serial.print(" --\t");
 
-    ledset(0, LED_COUNT).fadeLightBy(96);
+    ledset(0, LED_COUNT).fadeToBlackBy(96);
     // ledset(0, LED_COUNT) = CRGB::Black;
     fftComputeSampleset();
     fftFillBuckets();
@@ -528,8 +650,50 @@ void Effects::effectVUMeter() {
   }
 }
 
-void Effects::MusicDancer() {
-  EVERY_N_SECONDS(10) { Serial.println("  - effect: music dancer"); }
+void Effects::effectMusicDancer() {
+  CRGBSet ledset(leds, LED_COUNT);
+  // ledset(0, LED_COUNT) = CRGB::Black;
+
+  fftComputeSampleset();
+  fftFillBuckets();
+
+  uint16_t middle = LED_COUNT / 2;
+  uint16_t bass_size = LED_COUNT / 8;
+  uint16_t mid_size = LED_COUNT / 12;
+  uint16_t bass_amp = map(buckets[0], 0, 255, 0, bass_size);
+  uint16_t mid_amp = map(buckets[2], 0, 255, 0, mid_size);
+
+  uint16_t mid_left_start = middle - 1 - bass_size - mid_amp;
+  uint16_t mid_left_stop = middle - 1 - bass_size;
+  uint16_t mid_right_start = middle + bass_size;
+  uint16_t mid_right_stop = middle + bass_size + mid_amp;
+
+  ledset.fadeToBlackBy(4);
+
+  uint16_t pos = random16(LED_COUNT);
+  leds[pos] += CHSV(128 + random8(42), 255, 64);
+
+  ledset(mid_left_start - 10, mid_right_stop + 10).fadeToBlackBy(56);
+
+  if (mid_amp > 0) {
+    for (CRGB& pixel : ledset(mid_left_start, mid_left_stop)) {
+      pixel = CHSV(24 + random8(32), 255, 224 + random8(32));
+    }
+    for (CRGB& pixel : ledset(mid_right_start, mid_right_stop)) {
+      pixel = CHSV(24 + random8(32), 255, 224 + random8(32));
+    }
+  }
+
+  if (bass_amp > 0) {
+    // bass_left
+    for (CRGB& pixel : ledset(middle - 1 - bass_amp, middle - 1)) {
+      pixel = CHSV(248 + random8(16), 255, 224 + random8(32));
+    }
+    // bass_right
+    for (CRGB& pixel : ledset(middle, middle + bass_amp)) {
+      pixel = CHSV(248 + random8(16), 255, 224 + random8(32));
+    }
+  }
 }
 
 uint8_t freqBuckets[LED_COUNT];
@@ -580,34 +744,5 @@ void Effects::effectJuggle() {
   for (int i = 0; i < 8; i++) {
     leds[beatsin16(i + 7, 0, numberOfLeds - 1)] |= CHSV(dothue, 200, 255);
     dothue += 32;
-  }
-}
-
-void Effects::effectMSGSerial() {
-  EVERY_N_SECONDS(2) {
-    // msg serial
-    // Serial.println("  - effect: MSG Serial");
-  }
-
-  //  uint32_t colors[FFT_BUCKETS] = {CRGB::Red,   CRGB::OrangeRed,
-  //  CRGB::Orange,
-  //                                  CRGB::Green, CRGB::Aqua,      CRGB::Blue,
-  //                                  CRGB::Violet};
-  //
-  CRGBSet ledset(leds, LED_COUNT);
-  ledset(0, LED_COUNT) = CRGB::Black;
-
-  EVERY_N_MILLIS(1000 / FPS) {
-    MSGEQ7.read();
-
-    CRGBSet ledset(leds, LED_COUNT);
-    ledset(0, LED_COUNT) = CRGB::Black;
-
-    for (uint8_t i = 0; i < MAX_BAND; i++) {
-      unsigned long value = map(MSGEQ7.get(i), 20, 4095, 0, 255);
-      //        Serial.printf("%i\t", (int)value);
-      ledset(i * 8, (i * 8) + 8) = CHSV(startHue, 255, value);
-    }
-    Serial.println();
   }
 }

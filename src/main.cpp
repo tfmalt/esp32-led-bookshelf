@@ -64,14 +64,15 @@ void setupFastLED() {
 #endif
 
   FastLED.setMaxPowerInVoltsAndMilliamps(5, LED_mA);
-  FastLED.countFPS(FPS);
 
   lightState.initialize();
   LightState &currentState = lightState.getCurrentState();
 
 #ifdef DEBUG
   Serial.printf("  - state is: '%s'\n", currentState.state ? "On" : "Off");
+  FastLED.countFPS(FPS);
 #endif
+
   FastLED.setBrightness(currentState.state ? currentState.brightness : 0);
 
   // effects.setFPS(FPS);
@@ -169,10 +170,12 @@ void loop() {
 
     EVERY_N_MILLIS(timetowait) { FastLED.show(); }
 
-    EVERY_N_SECONDS(2) {
+#ifdef DEBUG
+    EVERY_N_SECONDS(10) {
       Serial.print("FPS: ");
       Serial.println(FastLED.getFPS());
     }
+#endif
 
     EVERY_N_SECONDS(300) {
       mqttCtrl.publishStatus();

@@ -10,10 +10,6 @@
 #include <arduinoFFT.h>
 #endif
 
-#ifdef MSG_ACTIVE
-#include <MD_MSGEQ7.h>
-#endif
-
 class Effects {
  private:
   typedef void (Effects::*LightCmd)();
@@ -31,6 +27,7 @@ class Effects {
   unsigned long sampleDelay();
   void fftComputeSampleset();
   void fftFillBuckets();
+  void fftFillBucketsSimple();
   void cmdEmpty();
   void cmdSetBrightness();
   void cmdFadeTowardColor();
@@ -47,11 +44,11 @@ class Effects {
   void effectRainbowByShelf();
   void effectBPM();
   void effectVUMeter();
+  void effectMusicDancer();
   void effectConfetti();
   void effectSinelon();
   void effectJuggle();
   void effectFrequencies();
-  void effectMSGSerial();
 
  public:
   enum Command { Null, None, Empty, Brightness, Color, FirmwareUpdate };
@@ -64,6 +61,7 @@ class Effects {
     Juggle,
     Sinelon,
     VUMeter,
+    MusicDancer,
     Frequencies,
     MSGSerial,
     NullEffect,
