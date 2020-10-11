@@ -68,6 +68,8 @@ void Effects::setCurrentEffect(String effect) {
 #ifdef DEBUG
   Serial.printf("  - Effects: Setting new effect: %s\n", effect.c_str());
 #endif
+
+  fill_solid(leds, LED_COUNT, CRGB::Black);
   setCurrentEffect(getEffectFromString(effect));
 }
 
@@ -81,8 +83,8 @@ Effects::Effect Effects::getEffectFromString(String str) {
   if (str == "Sinelon") return Effect::Sinelon;
   if (str == "VUMeter") return Effect::VUMeter;
   if (str == "Frequencies") return Effect::Frequencies;
-  if (str == "MSGSerial") return Effect::MSGSerial;
   if (str == "Music Dancer") return Effect::MusicDancer;
+  if (str == "Pride") return Effect::Pride;
 
   return Effect::NullEffect;
 }
@@ -103,6 +105,9 @@ void Effects::setCurrentEffect(Effect effect) {
       break;
     case Effect::BPM:
       currentEffect = &Effects::effectBPM;
+      break;
+    case Effect::Pride:
+      currentEffect = &Effects::effectPride;
       break;
     case Effect::VUMeter:
       currentEffect = &Effects::effectVUMeter;
@@ -272,61 +277,6 @@ void Effects::fftComputeSampleset() {
   // unsigned long doneCompute = micros();
 }
 
-void Effects::fftFillBucketsSimple() {
-  enum { PREV = 0, CURR = 1, NEXT = 2 };
-  int comp[3];
-
-  EVERY_N_MILLIS(1000) {
-    Serial.println();
-    Serial.printf("%6s\t", "curr");
-    for (int i = 2; i < 42; i++) {
-      Serial.printf("%6i\t", i);
-    }
-    Serial.println();
-    for (int i = 1; i < 42; i++) {
-      Serial.printf("------\t");
-    }
-    Serial.println();
-  }
-
-  for (int i = 2; i < FFT_SAMPLES / 2; i++) {
-    if (i == 2) {
-      // Bass: 50 - 250 Hz
-      comp[CURR] = (int)vReal[2];
-      comp[NEXT] = (int)vReal[3];
-
-      if (comp[CURR] < comp[NEXT]) comp[CURR] = 0;
-
-      comp[CURR] = constrain(comp[CURR], 0, 48000);
-      // Serial.printf("%6i\t", comp[CURR]);
-      buckets[0] = (uint8_t)map(comp[CURR], 0, 48000, 0, 255);
-
-      comp[CURR] = 0;
-    }
-    if (i > 2 && i < 4) {
-      // Low Midrange: 250 - 500 Hz
-      comp[CURR] = max(comp[CURR], (int)vReal[i]);
-    }
-
-    if (i == 4) {
-      comp[PREV] = (int)vReal[2];
-      comp[NEXT] = (int)vReal[6];
-
-      if (comp[CURR] < comp[PREV]) comp[CURR] = 0;
-      if (comp[CURR] < comp[NEXT]) comp[CURR] = 0;
-
-      Serial.printf("%6i\t", comp[CURR]);
-      comp[CURR] = constrain(comp[CURR], 0, 44000);
-      buckets[1] = (uint8_t)map(comp[CURR], 0, 44000, 0, 255);
-    }
-
-    if (i < 42) {
-      Serial.printf("%6i\t", (int)vReal[i]);
-    }
-  }
-  Serial.println();
-}
-
 void Effects::fftFillBuckets() {
   int next = 0;
   int prev = 0;
@@ -363,8 +313,8 @@ void Effects::fftFillBuckets() {
   }
 
   if (prev > (curr * 1.08)) curr = 0;
-  if (next > (curr * 0.4)) curr = 0;
-  if (curr < 6000) curr = 0;  // remove noise from below.
+  // if (next > (curr * 0.4)) curr = 0;
+  // if (curr < 6000) curr = 0;  // remove noise from below.
 
   // Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
   curr -= 8000;
@@ -376,52 +326,52 @@ void Effects::fftFillBuckets() {
 
   // ====================================================================
   // 2: Midrange: 500 - 1 kHz
-  prev = 0;
+  // prev = 0;
   curr = 0;
-  next = 0;
+  // next = 0;
 
-  for (int i = 2; i < 6; i++) {
-    prev = max((int)vReal[i], prev);
-  }
-
+  // for (int i = 2; i < 6; i++) {
+  //   prev = max((int)vReal[i], prev);
+  // }
+  //
   for (int i = 6; i < 11; i++) {
     curr = (vReal[i] > curr) ? vReal[i] : curr;
   }
-
-  for (int i = 11; i < 21; i++) {
-    next = (vReal[i] > next) ? vReal[i] : next;
-  }
-
-  if (next > (curr * 0.36)) curr = 0;
-  if (prev > (curr * 2.68)) curr = 0;
+  //
+  //   for (int i = 11; i < 21; i++) {
+  //     next = (vReal[i] > next) ? vReal[i] : next;
+  //   }
+  //
+  //   if (next > (curr * 0.36)) curr = 0;
+  //   if (prev > (curr * 2.68)) curr = 0;
 
   //   Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
 
-  curr = constrain(curr, 0, 32000);
-  curr = map(curr, 0, 32000, 0, 255);
+  curr = constrain(curr, 0, 56000);
+  curr = map(curr, 0, 56000, 0, 255);
 
   buckets[2] = (uint8_t)curr;
 
   // ====================================================================
   // 3: Midrange: 1 - 2 kHz
   curr = 0;
-  next = 0;
-  prev = 0;
-
-  for (int i = 2; i < 11; i++) {
-    prev = max((int)vReal[i], prev);
-  }
-
+  // next = 0;
+  // prev = 0;
+  //
+  //   for (int i = 2; i < 11; i++) {
+  //     prev = max((int)vReal[i], prev);
+  //   }
+  //
   for (int i = 11; i < 21; i++) {
     curr = max((int)vReal[i], curr);
   }
-
-  for (int i = 21; i < 41; i++) {
-    next = max((int)vReal[i], next);
-  }
-
-  if (next > (curr * 0.29)) curr = 0;
-  if (prev > (curr * 2.84)) curr = 0;
+  //
+  //   for (int i = 21; i < 41; i++) {
+  //     next = max((int)vReal[i], next);
+  //   }
+  //
+  //   if (next > (curr * 0.29)) curr = 0;
+  //   if (prev > (curr * 2.84)) curr = 0;
 
   // Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
 
@@ -436,22 +386,22 @@ void Effects::fftFillBuckets() {
   // ====================================================================
   // 4: Upper Midrange: 2 - 4 kHz
   curr = 0;
-  next = 0;
-
-  for (int i = 11; i < 21; i++) {
-    prev = max((int)vReal[i], prev);
-  }
-
+  // next = 0;
+  //
+  //   for (int i = 11; i < 21; i++) {
+  //     prev = max((int)vReal[i], prev);
+  //   }
+  //
   for (int i = 21; i < 40; i++) {
     curr = max((int)vReal[i], curr);
   }
-
-  for (int i = 41; i < 80; i++) {
-    next = max((int)vReal[i], next);
-  }
-
-  if (prev > (curr * 3.74)) curr = 0;
-  if (next > (curr * 0.30)) curr = 0;
+  //
+  //   for (int i = 41; i < 80; i++) {
+  //     next = max((int)vReal[i], next);
+  //   }
+  //
+  //   if (prev > (curr * 3.74)) curr = 0;
+  //   if (next > (curr * 0.30)) curr = 0;
 
   // Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
 
@@ -466,22 +416,22 @@ void Effects::fftFillBuckets() {
   // ====================================================================
   //   // 5: precence: 4 - 6 kHz
   curr = 0;
-  next = 0;
-
-  for (int i = 21; i < 40; i++) {
-    prev = max((int)vReal[i], prev);
-  }
-
+  // next = 0;
+  //
+  //   for (int i = 21; i < 40; i++) {
+  //     prev = max((int)vReal[i], prev);
+  //   }
+  //
   for (int i = 40; i < 60; i++) {
     curr = max((int)vReal[i], curr);
   }
-
-  for (int i = 60; i < 240; i++) {
-    next = max((int)vReal[i], next);
-  }
-
-  if (prev > (curr * 1.10)) curr = 0;
-  if (next > (curr * 0.86)) curr = 0;
+  //
+  //   for (int i = 60; i < 240; i++) {
+  //     next = max((int)vReal[i], next);
+  //   }
+  //
+  //   if (prev > (curr * 1.10)) curr = 0;
+  //   if (next > (curr * 0.86)) curr = 0;
 
   //   Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
 
@@ -496,17 +446,17 @@ void Effects::fftFillBuckets() {
   // ====================================================================
   // 6: Brilliance: 6 - 20 kHz kHz
   curr = 0;
-  next = 0;
-
-  for (int i = 40; i < 60; i++) {
-    prev = max((int)vReal[i], prev);
-  }
-
+  // next = 0;
+  //
+  //   for (int i = 40; i < 60; i++) {
+  //     prev = max((int)vReal[i], prev);
+  //   }
+  //
   for (int i = 60; i < 240; i++) {
     curr = max((int)vReal[i], curr);
   }
-
-  if (prev > (curr * 1.30)) curr = 0;
+  //
+  //   if (prev > (curr * 1.30)) curr = 0;
 
   // Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
 
@@ -616,6 +566,21 @@ void Effects::effectBPM() {
   }
 }
 
+void Effects::effectPride() {
+  EVERY_N_SECONDS(2) { Serial.println("  - Pride colors"); }
+  CRGBSet ledset(leds, LED_COUNT);
+
+  uint8_t num_colors = 6;
+  uint8_t segment = LED_COUNT / num_colors;
+
+  uint32_t colors[num_colors] = {0xEF0000, 0xFF4000, 0xFFEF00,
+                                 0x008000, 0x0000F0, 0x800070};
+
+  for (int i = 0; i < num_colors; i++) {
+    ledset(i * segment, (i * segment) + segment) = colors[i];
+  }
+}
+
 /** =====================================================================
  * FFT based spectrum analyzer disco lights
  */
@@ -658,41 +623,39 @@ void Effects::effectMusicDancer() {
   fftFillBuckets();
 
   uint16_t middle = LED_COUNT / 2;
-  uint16_t bass_size = LED_COUNT / 8;
-  uint16_t mid_size = LED_COUNT / 12;
-  uint16_t bass_amp = map(buckets[0], 0, 255, 0, bass_size);
-  uint16_t mid_amp = map(buckets[2], 0, 255, 0, mid_size);
 
-  uint16_t mid_left_start = middle - 1 - bass_size - mid_amp;
-  uint16_t mid_left_stop = middle - 1 - bass_size;
-  uint16_t mid_right_start = middle + bass_size;
-  uint16_t mid_right_stop = middle + bass_size + mid_amp;
+  uint16_t bass_size = LED_COUNT / 6;
+  uint16_t mid_size = LED_COUNT / 3;
+  uint16_t low_size = LED_COUNT;
 
-  ledset.fadeToBlackBy(4);
+  uint16_t bass_amp = map(buckets[0], 0, 255, 0, 8);
+  uint16_t low_amp = map(buckets[4], 0, 255, 0, 24);
+  uint16_t mid_amp = map(buckets[2], 0, 255, 0, 8);
 
-  uint16_t pos = random16(LED_COUNT);
-  leds[pos] += CHSV(128 + random8(42), 255, 64);
+  uint16_t bass_start = middle - bass_size;
+  uint16_t bass_stop = middle + bass_size;
 
-  ledset(mid_left_start - 10, mid_right_stop + 10).fadeToBlackBy(56);
+  uint16_t mid_start = middle - mid_size;
+  uint16_t mid_stop = middle + mid_size;
 
-  if (mid_amp > 0) {
-    for (CRGB& pixel : ledset(mid_left_start, mid_left_stop)) {
-      pixel = CHSV(24 + random8(32), 255, 224 + random8(32));
-    }
-    for (CRGB& pixel : ledset(mid_right_start, mid_right_stop)) {
-      pixel = CHSV(24 + random8(32), 255, 224 + random8(32));
-    }
+  uint16_t low_start = middle - low_size;
+  uint16_t low_stop = middle + low_size;
+
+  ledset.fadeToBlackBy(48);
+
+  for (int i = 0; i < low_amp; i++) {
+    uint16_t pos = random16(LED_COUNT);
+    leds[pos] = CHSV(96 + random8(48), 255, buckets[4]);
   }
 
-  if (bass_amp > 0) {
-    // bass_left
-    for (CRGB& pixel : ledset(middle - 1 - bass_amp, middle - 1)) {
-      pixel = CHSV(248 + random8(16), 255, 224 + random8(32));
-    }
-    // bass_right
-    for (CRGB& pixel : ledset(middle, middle + bass_amp)) {
-      pixel = CHSV(248 + random8(16), 255, 224 + random8(32));
-    }
+  for (int i = 0; i < mid_amp; i++) {
+    uint16_t pos = random16(mid_start, mid_stop);
+    leds[pos] = CHSV(24 + random8(32), 255, buckets[2]);
+  }
+
+  for (int i = 0; i < bass_amp; i++) {
+    uint16_t pos = random16(bass_start, bass_stop);
+    leds[pos] = CHSV(248 + random8(16), 255, buckets[0]);
   }
 }
 
@@ -739,10 +702,12 @@ void Effects::effectFrequencies() {
  * eight colored dots, weaving in and out of sync with each other
  */
 void Effects::effectJuggle() {
-  fadeToBlackBy(leds, numberOfLeds, 20);
-  byte dothue = 0;
-  for (int i = 0; i < 8; i++) {
-    leds[beatsin16(i + 7, 0, numberOfLeds - 1)] |= CHSV(dothue, 200, 255);
-    dothue += 32;
+  EVERY_N_MILLIS(1000 / FPS) {
+    fadeToBlackBy(leds, numberOfLeds, 20);
+    byte dothue = 0;
+    for (int i = 0; i < 8; i++) {
+      leds[beatsin16(i + 7, 0, numberOfLeds - 1)] |= CHSV(dothue, 200, 255);
+      dothue += 32;
+    }
   }
 }

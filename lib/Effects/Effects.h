@@ -44,6 +44,7 @@ class Effects {
   void effectRainbowByShelf();
   void effectBPM();
   void effectVUMeter();
+  void effectPride();
   void effectMusicDancer();
   void effectConfetti();
   void effectSinelon();
@@ -60,10 +61,10 @@ class Effects {
     RainbowByShelf,
     Juggle,
     Sinelon,
+    Pride,
     VUMeter,
     MusicDancer,
     Frequencies,
-    MSGSerial,
     NullEffect,
     EmptyEffect,
     NoEffect
