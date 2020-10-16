@@ -262,10 +262,34 @@ unsigned long Effects::sampleDelay() {
   return (newtime + sampling_period);
 }
 
+// 5 per second for 20 seconds
+
+#define AVG_MAX 200
+#define AVG_BASE 2047
+#define FFT_LOW_CUTOFF 32000
+#define FFT_HIGH_CUTOFF 320000
+
+uint16_t AVG_SAMP[AVG_MAX];
+uint32_t AVG_CTR = 0;
+double AMP_FACTOR = 1.00;
+
 void Effects::fftComputeSampleset() {
   // unsigned long start = micros();
+  uint16_t sample;
+
   for (int i = 0; i < FFT_SAMPLES; i++) {
-    vReal[i] = analogRead(FFT_INPUT_PIN);
+    sample = analogRead(FFT_INPUT_PIN);
+
+    EVERY_N_MILLIS(200) {
+      AVG_SAMP[(AVG_CTR % AVG_MAX)] = sample;
+      AVG_CTR++;
+    }
+
+    int adjusted = (int)(sample * AMP_FACTOR);
+    if (adjusted < 0) adjusted = 0;
+    if (adjusted > 4095) adjusted = 4095;
+
+    vReal[i] = adjusted;
     vImag[i] = 0;
   }
   // unsigned long doneSamples = micros();
@@ -273,8 +297,24 @@ void Effects::fftComputeSampleset() {
   FFT.Windowing(vReal, FFT_SAMPLES, FFT_WIN_TYP_HAMMING, FFT_FORWARD);
   FFT.Compute(vReal, vImag, FFT_SAMPLES, FFT_FORWARD);
   FFT.ComplexToMagnitude(vReal, vImag, FFT_SAMPLES);
-
   // unsigned long doneCompute = micros();
+
+  EVERY_N_MILLIS(10000) {
+    // Calculate average amplitude every 5 seconds.
+    uint32_t avg_sum = 0;
+    for (int i = 0; i < AVG_MAX; i++) {
+      avg_sum += AVG_SAMP[i];
+    }
+
+    double avg =
+        (AVG_CTR > 200) ? avg_sum / (double)AVG_MAX : avg_sum / (double)AVG_CTR;
+    AMP_FACTOR = (avg > 0) ? AVG_BASE / avg : 0;
+
+#ifdef DEBUG
+    Serial.printf("Average: raw: %6i\t avg: %8.2f\tfac: %8.2f\tadj: %6i\n",
+                  sample, avg, AMP_FACTOR, (int)(avg * AMP_FACTOR));
+#endif
+  }
 }
 
 void Effects::fftFillBuckets() {
@@ -287,14 +327,15 @@ void Effects::fftFillBuckets() {
   curr = (int)vReal[2];
   next = (int)vReal[3];
 
-  //   Serial.printf("%7i\t", (int)vReal[2]);
+  if (next > (curr * 2.19)) curr = 0;
 
-  if (next > curr) curr = 0;
+  //  Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
 
-  // Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
+  curr -= FFT_LOW_CUTOFF;
+  if (curr < 0) curr = 0;
 
-  curr = constrain(curr, 0, 48000);
-  curr = map(curr, 0, 48000, 0, 255);
+  curr = constrain(curr, 0, FFT_HIGH_CUTOFF);
+  curr = map(curr, 0, FFT_HIGH_CUTOFF, 0, 255);
 
   buckets[0] = (uint8_t)curr;
 
@@ -308,20 +349,19 @@ void Effects::fftFillBuckets() {
     curr = max((int)vReal[i], curr);
   }
 
-  for (int i = 6; i < 11; i++) {
-    next = max((int)vReal[i], next);
-  }
+  //   for (int i = 6; i < 11; i++) {
+  //     next = max((int)vReal[i], next);
+  //   }
 
-  if (prev > (curr * 1.08)) curr = 0;
+  if (prev > (curr * 0.47)) curr = 0;
   // if (next > (curr * 0.4)) curr = 0;
-  // if (curr < 6000) curr = 0;  // remove noise from below.
 
-  // Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
-  curr -= 8000;
+  //   Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
+  curr -= FFT_LOW_CUTOFF;
   if (curr < 0) curr = 0;
 
-  curr = constrain(curr, 0, 56000);
-  curr = map(curr, 0, 56000, 0, 255);
+  curr = constrain(curr, 0, FFT_HIGH_CUTOFF);
+  curr = map(curr, 0, FFT_HIGH_CUTOFF, 0, 255);
   buckets[1] = (uint8_t)curr;
 
   // ====================================================================
@@ -334,7 +374,7 @@ void Effects::fftFillBuckets() {
   //   prev = max((int)vReal[i], prev);
   // }
   //
-  for (int i = 6; i < 11; i++) {
+  for (int i = 6; i < 12; i++) {
     curr = (vReal[i] > curr) ? vReal[i] : curr;
   }
   //
@@ -345,10 +385,12 @@ void Effects::fftFillBuckets() {
   //   if (next > (curr * 0.36)) curr = 0;
   //   if (prev > (curr * 2.68)) curr = 0;
 
-  //   Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
+  // Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
+  curr -= FFT_LOW_CUTOFF;
+  if (curr < 0) curr = 0;
 
-  curr = constrain(curr, 0, 56000);
-  curr = map(curr, 0, 56000, 0, 255);
+  curr = constrain(curr, 0, FFT_HIGH_CUTOFF);
+  curr = map(curr, 0, FFT_HIGH_CUTOFF, 0, 255);
 
   buckets[2] = (uint8_t)curr;
 
@@ -362,7 +404,7 @@ void Effects::fftFillBuckets() {
   //     prev = max((int)vReal[i], prev);
   //   }
   //
-  for (int i = 11; i < 21; i++) {
+  for (int i = 12; i < 24; i++) {
     curr = max((int)vReal[i], curr);
   }
   //
@@ -373,13 +415,12 @@ void Effects::fftFillBuckets() {
   //   if (next > (curr * 0.29)) curr = 0;
   //   if (prev > (curr * 2.84)) curr = 0;
 
-  // Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
-
-  curr -= 8000;
+  //  Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
+  curr -= FFT_LOW_CUTOFF;
   if (curr < 0) curr = 0;
 
-  curr = constrain(curr, 0, 56000);
-  curr = map(curr, 0, 56000, 0, 255);
+  curr = constrain(curr, 0, FFT_HIGH_CUTOFF);
+  curr = map(curr, 0, FFT_HIGH_CUTOFF, 0, 255);
 
   buckets[3] = (uint8_t)curr;
 
@@ -392,7 +433,7 @@ void Effects::fftFillBuckets() {
   //     prev = max((int)vReal[i], prev);
   //   }
   //
-  for (int i = 21; i < 40; i++) {
+  for (int i = 24; i < 48; i++) {
     curr = max((int)vReal[i], curr);
   }
   //
@@ -403,13 +444,12 @@ void Effects::fftFillBuckets() {
   //   if (prev > (curr * 3.74)) curr = 0;
   //   if (next > (curr * 0.30)) curr = 0;
 
-  // Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
-
-  curr -= 8000;
+  //  Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
+  curr -= FFT_LOW_CUTOFF;
   if (curr < 0) curr = 0;
 
-  curr = constrain(curr, 0, 56000);
-  curr = map(curr, 0, 56000, 0, 255);
+  curr = constrain(curr, 0, FFT_HIGH_CUTOFF);
+  curr = map(curr, 0, FFT_HIGH_CUTOFF, 0, 255);
 
   buckets[4] = (uint8_t)curr;
 
@@ -422,7 +462,7 @@ void Effects::fftFillBuckets() {
   //     prev = max((int)vReal[i], prev);
   //   }
   //
-  for (int i = 40; i < 60; i++) {
+  for (int i = 48; i < 72; i++) {
     curr = max((int)vReal[i], curr);
   }
   //
@@ -434,12 +474,11 @@ void Effects::fftFillBuckets() {
   //   if (next > (curr * 0.86)) curr = 0;
 
   //   Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
-
-  curr -= 8000;
+  curr -= FFT_LOW_CUTOFF;
   if (curr < 0) curr = 0;
 
-  curr = constrain(curr, 0, 56000);
-  curr = map(curr, 0, 56000, 0, 255);
+  curr = constrain(curr, 0, FFT_HIGH_CUTOFF);
+  curr = map(curr, 0, FFT_HIGH_CUTOFF, 0, 255);
 
   buckets[5] = (uint8_t)curr;
 
@@ -452,27 +491,27 @@ void Effects::fftFillBuckets() {
   //     prev = max((int)vReal[i], prev);
   //   }
   //
-  for (int i = 60; i < 240; i++) {
+  for (int i = 71; i < 240; i++) {
     curr = max((int)vReal[i], curr);
   }
   //
   //   if (prev > (curr * 1.30)) curr = 0;
 
   // Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
-
-  curr = curr - 8000;
+  curr -= FFT_LOW_CUTOFF;
   if (curr < 0) curr = 0;
 
-  curr = constrain(curr, 0, 56000);
-  curr = map(curr, 0, 56000, 0, 255);
+  curr = constrain(curr, 0, FFT_HIGH_CUTOFF);
+  curr = map(curr, 0, FFT_HIGH_CUTOFF, 0, 255);
 
   buckets[6] = (uint8_t)curr;
 
   // ====================================================================
   // Debug printing:
-  // int FROM = 60;
-  // int TO = 113;
-  // int MOD = 1;
+  // ====================================================================
+  // int FROM = 70;
+  // int TO = 175;
+  // int MOD = 2;
   //
   //   for (int i = FROM; i < TO; i++) {
   //     if (i % MOD == 0) Serial.printf("%6i\t", (int)vReal[i]);
@@ -628,9 +667,12 @@ void Effects::effectMusicDancer() {
   uint16_t mid_size = LED_COUNT / 3;
   uint16_t low_size = LED_COUNT;
 
-  uint16_t bass_amp = map(buckets[0], 0, 255, 0, 8);
-  uint16_t low_amp = map(buckets[4], 0, 255, 0, 24);
-  uint16_t mid_amp = map(buckets[2], 0, 255, 0, 8);
+  uint16_t bass_amp = map(buckets[0], 0, 255, 0, ((LED_COUNT / 6) * 2));
+  uint16_t mid_amp = map(buckets[2], 0, 255, 0, ((LED_COUNT / 3) * 2));
+  uint16_t low_amp = map(buckets[3], 0, 255, 0, (LED_COUNT / 2));
+  uint16_t high_amp = map(buckets[4], 0, 255, 0, (LED_COUNT / 2));
+  uint16_t bril_amp = map(buckets[5], 0, 255, 0, (LED_COUNT / 2));
+  uint16_t air_amp = map(buckets[6], 0, 255, 0, (LED_COUNT / 2));
 
   uint16_t bass_start = middle - bass_size;
   uint16_t bass_stop = middle + bass_size;
@@ -638,14 +680,27 @@ void Effects::effectMusicDancer() {
   uint16_t mid_start = middle - mid_size;
   uint16_t mid_stop = middle + mid_size;
 
-  uint16_t low_start = middle - low_size;
-  uint16_t low_stop = middle + low_size;
-
   ledset.fadeToBlackBy(48);
+  // ledset.fadeLightBy(48);
+
+  for (int i = 0; i < high_amp; i++) {
+    uint16_t pos = random16(LED_COUNT);
+    leds[pos] = CHSV(96 + random8(16), 255, buckets[4]);
+  }
+
+  for (int i = 0; i < bril_amp; i++) {
+    uint16_t pos = random16(LED_COUNT);
+    leds[pos] = CHSV(128 + random8(16), 255, buckets[5]);
+  }
+
+  for (int i = 0; i < air_amp; i++) {
+    uint16_t pos = random16(LED_COUNT);
+    leds[pos] = CHSV(192 + random8(16), 128, buckets[6]);
+  }
 
   for (int i = 0; i < low_amp; i++) {
     uint16_t pos = random16(LED_COUNT);
-    leds[pos] = CHSV(96 + random8(48), 255, buckets[4]);
+    leds[pos] = CHSV(144 + random8(16), 255, buckets[3]);
   }
 
   for (int i = 0; i < mid_amp; i++) {
