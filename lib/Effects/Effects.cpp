@@ -85,6 +85,8 @@ Effects::Effect Effects::getEffectFromString(String str) {
   if (str == "Frequencies") return Effect::Frequencies;
   if (str == "Music Dancer") return Effect::MusicDancer;
   if (str == "Pride") return Effect::Pride;
+  if (str == "Colorloop") return Effect::Colorloop;
+  if (str == "Walking Rainbow") return Effect::WalkingRainbow;
 
   return Effect::NullEffect;
 }
@@ -108,6 +110,12 @@ void Effects::setCurrentEffect(Effect effect) {
       break;
     case Effect::Pride:
       currentEffect = &Effects::effectPride;
+      break;
+    case Effect::Colorloop:
+      currentEffect = &Effects::effectColorloop;
+      break;
+    case Effect::WalkingRainbow:
+      currentEffect = &Effects::effectWalkingRainbow;
       break;
     case Effect::VUMeter:
       currentEffect = &Effects::effectVUMeter;
@@ -156,17 +164,19 @@ void Effects::cmdSetBrightness() {
   uint8_t target = state.brightness;
   uint8_t current = FastLED.getBrightness();
 
-  if (commandFrameCount < commandFrames) {
-    FastLED.setBrightness(
-        current + ((target - current) / (commandFrames - commandFrameCount)));
-    commandFrameCount++;
-  } else {
+  EVERY_N_MILLIS(1000 / FPS) {
+    if (commandFrameCount < commandFrames) {
+      FastLED.setBrightness(
+          current + ((target - current) / (commandFrames - commandFrameCount)));
+      commandFrameCount++;
+    } else {
 #ifdef DEBUG
-    Serial.printf("  - command: setting brightness DONE [%i] %lu ms.\n",
-                  FastLED.getBrightness(), (millis() - commandStart));
+      Serial.printf("  - command: setting brightness DONE [%i] %lu ms.\n",
+                    FastLED.getBrightness(), (millis() - commandStart));
 #endif
 
-    setCurrentCommand(Command::None);
+      setCurrentCommand(Command::None);
+    }
   }
 }
 
@@ -563,7 +573,7 @@ void Effects::addGlitter(fract8 chanceOfGlitter) {
 void Effects::effectGlitterRainbow() {
   // built-in FastLED rainbow, plus some random sparkly glitter
   effectRainbow();
-  addGlitter(80);
+  EVERY_N_MILLIS(1000 / FPS) { addGlitter(160); }
 }
 
 void Effects::effectConfetti() {
@@ -606,7 +616,6 @@ void Effects::effectBPM() {
 }
 
 void Effects::effectPride() {
-  EVERY_N_SECONDS(2) { Serial.println("  - Pride colors"); }
   CRGBSet ledset(leds, LED_COUNT);
 
   uint8_t num_colors = 6;
@@ -617,6 +626,35 @@ void Effects::effectPride() {
 
   for (int i = 0; i < num_colors; i++) {
     ledset(i * segment, (i * segment) + segment) = colors[i];
+  }
+}
+
+void Effects::effectWalkingRainbow() {
+  EVERY_N_SECONDS(2) {
+    Serial.printf("  - Running Walking Rainbow: %i\n", startHue);
+  }
+
+  EVERY_N_MILLIS(1000 / 60) {
+    uint8_t inc = 256 / LED_COUNT;
+    uint8_t hue = startHue;
+
+    for (int i = 0; i < LED_COUNT; i++) {
+      hue += inc;
+      leds[i] = CHSV(hue, 255, 255);
+    }
+
+    startHue--;
+  }
+}
+
+void Effects::effectColorloop() {
+  // EVERY_N_SECONDS(2) { Serial.printf("  - Running colorloop: %i\n",
+  // startHue); }
+
+  EVERY_N_MILLIS(1000 / 10) {
+    CRGBSet ledset(leds, LED_COUNT);
+    startHue += 1;
+    ledset = CHSV(startHue, 255, 255);
   }
 }
 

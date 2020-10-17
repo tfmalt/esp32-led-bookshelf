@@ -45,6 +45,8 @@ class Effects {
   void effectBPM();
   void effectVUMeter();
   void effectPride();
+  void effectColorloop();
+  void effectWalkingRainbow();
   void effectMusicDancer();
   void effectConfetti();
   void effectSinelon();
@@ -62,6 +64,8 @@ class Effects {
     Juggle,
     Sinelon,
     Pride,
+    Colorloop,
+    WalkingRainbow,
     VUMeter,
     MusicDancer,
     Frequencies,
