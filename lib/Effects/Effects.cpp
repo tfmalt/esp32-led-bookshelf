@@ -635,7 +635,7 @@ void Effects::effectWalkingRainbow() {
   }
 
   EVERY_N_MILLIS(1000 / 60) {
-    uint8_t inc = 256 / LED_COUNT;
+    uint8_t inc = 2;  // 256 / LED_COUNT;
     uint8_t hue = startHue;
 
     for (int i = 0; i < LED_COUNT; i++) {
