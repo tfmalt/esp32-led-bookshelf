@@ -177,8 +177,13 @@ void loop() {
     }
 #endif
 
+    EVERY_N_SECONDS(60) { mqttCtrl.publishStatus(); }
+
+#ifdef DEBUG
+    EVERY_N_SECONDS(60) {
+#else
     EVERY_N_SECONDS(300) {
-      mqttCtrl.publishStatus();
+#endif
       mqttCtrl.publishInformationData();
     }
   }
