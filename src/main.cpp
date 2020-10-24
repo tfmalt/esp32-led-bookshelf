@@ -83,6 +83,7 @@ void setupFastLED() {
 }
 // END OF setupFastLED
 
+uint8_t OTA_HUE = 64;
 void setupArduinoOTA() {
   ArduinoOTA.setPort(3232);
   ArduinoOTA.setPassword(config.mqtt_password);
@@ -96,6 +97,27 @@ void setupArduinoOTA() {
         mqttCtrl.publishInformation((String("Start updating " + type)).c_str());
       })
       .onEnd([]() { mqttCtrl.publishInformation("Finished"); })
+      .onProgress([](uint32_t progress, uint32_t total) {
+        uint8_t percent = progress / (total / 100);
+        uint8_t range = map(percent, 0, 100, 0, 15);
+        uint8_t step = 255 / 15;
+        EVERY_N_MILLIS(25) {
+          OTA_HUE += 1;
+
+          for (int i = 0; i <= range; i++) {
+            uint8_t step_hue = OTA_HUE + (i * step);
+            leds[i] = CHSV(step_hue, 255, 255);
+          }
+          // leds(0, range) = CHSV(96, 255, 255);
+          FastLED.show();
+        }
+#ifdef DEBUG
+        EVERY_N_MILLIS(1000) {
+          Serial.printf("  - Progress: %u %u - percent: %u, range: %u\n",
+                        progress, total, percent, range);
+        }
+#endif
+      })
       .onError([](ota_error_t error) {
 #ifdef DEBUG
         Serial.printf("Error[%u]: ", error);
@@ -160,22 +182,14 @@ void loop() {
 
   if (effects.currentCommandType == Effects::Command::FirmwareUpdate) {
     ArduinoOTA.handle();
-    if (millis() > (effects.commandStart + 180000)) {
+    if (millis() > (effects.commandStart + 30000)) {
       mqttCtrl.publishInformation("No update started for 180s. Rebooting.");
+      delay(1000);
       ESP.restart();
     }
   } else {
     effects.runCurrentCommand();
     effects.runCurrentEffect();
-
-    EVERY_N_MILLIS(timetowait) { FastLED.show(); }
-
-#ifdef DEBUG
-    EVERY_N_SECONDS(10) {
-      Serial.print("FPS: ");
-      Serial.println(FastLED.getFPS());
-    }
-#endif
 
     EVERY_N_SECONDS(60) { mqttCtrl.publishStatus(); }
 
@@ -187,4 +201,12 @@ void loop() {
       mqttCtrl.publishInformationData();
     }
   }
+#ifdef DEBUG
+  EVERY_N_SECONDS(10) {
+    Serial.print("FPS: ");
+    Serial.println(FastLED.getFPS());
+  }
+#endif
+
+  EVERY_N_MILLIS(timetowait) { FastLED.show(); }
 }

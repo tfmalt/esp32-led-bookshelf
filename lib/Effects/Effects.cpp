@@ -26,6 +26,7 @@ DEFINE_GRADIENT_PALETTE(Paired_07_gp){
     1,   1,   218, 188, 1,   1,   218, 249, 135, 31,  255, 249, 135, 31};
 
 CRGBPalette16 vuColors = Paired_07_gp;
+
 Effects::Effects() {
   currentCommand = &Effects::cmdEmpty;
   currentEffect = &Effects::cmdEmpty;
@@ -148,12 +149,13 @@ void Effects::runCurrentEffect() { (this->*currentEffect)(); }
 void Effects::cmdEmpty() {}
 
 void Effects::cmdFirmwareUpdate() {
-  fill_solid(leds, 15, CRGB::Black);
+  fill_solid(leds, LED_COUNT, CRGB::Black);
   // fill_solid(leds, 15, CRGB::White);
   leds[3] = CRGB::White;
   leds[7] = CRGB::White;
   leds[11] = CRGB::White;
   leds[15] = CRGB::White;
+  leds[16] = CRGB::White;
 
   FastLED.show();
 }
@@ -309,7 +311,7 @@ void Effects::fftComputeSampleset() {
   FFT.ComplexToMagnitude(vReal, vImag, FFT_SAMPLES);
   // unsigned long doneCompute = micros();
 
-  EVERY_N_MILLIS(10000) {
+  EVERY_N_MILLIS(1000) {
     // Calculate average amplitude every 5 seconds.
     uint32_t avg_sum = 0;
     for (int i = 0; i < AVG_MAX; i++) {
@@ -591,15 +593,17 @@ void Effects::effectConfetti() {
 
 // a colored dot sweeping back and forth, with fading trails
 void Effects::effectSinelon() {
-  EVERY_N_MILLIS(8) { fadeToBlackBy(leds, numberOfLeds, 32); }
-  LightState state = lightState->getCurrentState();
+  EVERY_N_MILLIS(8) { fadeToBlackBy(leds, LED_COUNT, 16); }
+
+  EVERY_N_MILLIS(200) { startHue += 1; }
+  // LightState state = lightState->getCurrentState();
 
   // calculate a suiting pulserate for the number of leds.
-  uint8_t bpm = 1000 / numberOfLeds;
+  uint8_t bpm = 750 / LED_COUNT;
 
-  int pos = beatsin16(bpm, 0, numberOfLeds - 1);
-  // leds[pos] += CHSV( startHue, 255, 255);
-  leds[pos] += CRGB(state.color.r, state.color.g, state.color.b);
+  int pos = beatsin16(bpm, 0, LED_COUNT - 1);
+  leds[pos] = CHSV(startHue, 255, 255);
+  // leds[pos] += CRGB(state.color.r, state.color.g, state.color.b);
 }
 
 /**
