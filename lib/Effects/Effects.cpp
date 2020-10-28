@@ -5,6 +5,9 @@
 #define SAMPLING_FREQUENCY 40000
 #define FFT_SAMPLES 1024
 #define FFT_BUCKETS 7
+
+#include <driver/adc.h>
+
 double vReal[FFT_SAMPLES];
 double vImag[FFT_SAMPLES];
 
@@ -14,25 +17,42 @@ int segment = LED_COUNT / FFT_BUCKETS;
 arduinoFFT FFT = arduinoFFT();
 #endif
 
-// Gradient palette "Paired_07_gp", originally from
-// http://soliton.vm.bytemark.co.uk/pub/cpt-city/cb/qual/tn/Paired_07.png.index.html
-// converted for FastLED with gammas (2.6, 2.2, 2.5)
-// Size: 56 bytes of program space.
-
 DEFINE_GRADIENT_PALETTE(Paired_07_gp){
     0,   83,  159, 190, 36,  83,  159, 190, 36,  1,   48,  106, 72,  1,
     48,  106, 72,  100, 189, 54,  109, 100, 189, 54,  109, 3,   91,  3,
     145, 3,   91,  3,   145, 244, 84,  71,  182, 244, 84,  71,  182, 188,
     1,   1,   218, 188, 1,   1,   218, 249, 135, 31,  255, 249, 135, 31};
 
-CRGBPalette16 vuColors = Paired_07_gp;
+DEFINE_GRADIENT_PALETTE(bhw1_05_gp){0, 1, 221, 53, 255, 73, 3, 178};
+DEFINE_GRADIENT_PALETTE(RdYlBu_gp){
+    0,   82, 0,   2,   31,  163, 6,   2,   63,  227, 39,  9,  95,  249,
+    109, 22, 127, 252, 191, 61,  127, 182, 229, 237, 159, 90, 178, 203,
+    191, 32, 108, 155, 223, 8,   45,  106, 255, 3,   8,   66};
 
-Effects::Effects() {
-  currentCommand = &Effects::cmdEmpty;
-  currentEffect = &Effects::cmdEmpty;
+DEFINE_GRADIENT_PALETTE(Sunset_Real_gp){
+    0,  120, 0,   0,   22, 179, 22,  0,  51, 255, 104, 0, 85, 167,
+    22, 18,  135, 100, 0,  103, 198, 16, 0,  130, 255, 0, 0,  160};
 
-  currentCommandType = Command::None;
-  currentEffectType = Effect::NullEffect;
+DEFINE_GRADIENT_PALETTE(summer_gp){
+    0,   0,   55,  25, 17,  1,   62,  25, 33,  1,   72,  25, 51,  3,   82,  25,
+    68,  8,   92,  25, 84,  14,  104, 25, 102, 23,  115, 25, 119, 35,  127, 25,
+    135, 48,  141, 25, 153, 67,  156, 25, 170, 88,  169, 25, 186, 112, 186, 25,
+    204, 142, 201, 25, 221, 175, 217, 25, 237, 210, 235, 25, 255, 255, 255, 25};
+
+DEFINE_GRADIENT_PALETTE(gr65_hult_gp){0,   247, 176, 247, 48,  255, 136, 255,
+                                      89,  220, 29,  226, 160, 7,   82,  178,
+                                      216, 1,   124, 109, 255, 1,   124, 109};
+
+void Effects::setup() {
+#ifdef DEBUG
+  Serial.println("  - Running Effects Setup");
+#endif
+#ifdef FFT_ACTIVE
+  analogReadResolution(12);
+  analogSetCycles(8);
+  analogSetSamples(1);
+  analogSetAttenuation(ADC_11db);
+#endif
 }
 
 void Effects::setLightStateController(LightStateController* l) {
@@ -77,6 +97,7 @@ void Effects::setCurrentEffect(String effect) {
 Effects::Effect Effects::getEffectFromString(String str) {
   if (str == "Glitter Rainbow") return Effect::GlitterRainbow;
   if (str == "Rainbow") return Effect::Rainbow;
+  if (str == "Gradient") return Effect::Gradient;
   if (str == "RainbowByShelf") return Effect::RainbowByShelf;
   if (str == "BPM") return Effect::BPM;
   if (str == "Confetti") return Effect::Confetti;
@@ -102,6 +123,9 @@ void Effects::setCurrentEffect(Effect effect) {
       break;
     case Effect::Rainbow:
       currentEffect = &Effects::effectRainbow;
+      break;
+    case Effect::Gradient:
+      currentEffect = &Effects::effectGradient;
       break;
     case Effect::RainbowByShelf:
       currentEffect = &Effects::effectRainbowByShelf;
@@ -550,6 +574,31 @@ void Effects::fftFillBuckets() {
 // =====================================================================
 void Effects::effectRainbow() { fill_rainbow(leds, numberOfLeds, startHue, 2); }
 
+uint16_t GRAD_INDEX = 0;
+CRGBPalette256 pal = Sunset_Real_gp;
+uint8_t j = 0;
+void Effects::effectGradient() {
+  CRGBPalette256 palettes[6] = {RdYlBu_gp, Paired_07_gp, bhw1_05_gp,
+                                summer_gp, gr65_hult_gp, Sunset_Real_gp};
+
+  EVERY_N_SECONDS(30) {
+    Serial.printf("  - effect Gradient #: %i\n", j);
+    pal = palettes[j];
+    j = (j < 5) ? j + 1 : 0;
+  }
+
+  uint8_t step = (256 / LED_COUNT);
+
+  // EVERY_N_MILLIS(1000 / FPS) { GRAD_INDEX++; }
+  EVERY_N_MILLIS(1000 / FPS) {
+    GRAD_INDEX = beatsin16(2, 0, 257 * 8);
+    fill_palette(leds, LED_COUNT, GRAD_INDEX, step, pal, 255, LINEARBLEND);
+    // fill_palette(end, (LED_COUNT / 2) - 1, REV_INDEX, step, pal, 255,
+    //              LINEARBLEND);
+    // end = start;
+  }
+}
+
 void Effects::effectRainbowByShelf() {
   CRGBSet ledset(leds, numberOfLeds);
   ledset(0, 63).fill_rainbow(startHue, 4);
@@ -696,6 +745,7 @@ void Effects::effectVUMeter() {
   }
 }
 
+CRGBPalette256 colPal = Sunset_Real_gp;
 void Effects::effectMusicDancer() {
   CRGBSet ledset(leds, LED_COUNT);
   // ledset(0, LED_COUNT) = CRGB::Black;
@@ -705,54 +755,76 @@ void Effects::effectMusicDancer() {
 
   uint16_t middle = LED_COUNT / 2;
 
-  uint16_t bass_size = LED_COUNT / 6;
-  uint16_t mid_size = LED_COUNT / 3;
-  uint16_t low_size = LED_COUNT;
+  uint16_t bass_size = LED_COUNT / 10;
+  uint16_t mid_size = LED_COUNT / 10;
+  // uint16_t low_size = LED_COUNT / 10;
 
-  uint16_t bass_amp = map(buckets[0], 0, 255, 0, ((LED_COUNT / 6) * 2));
-  uint16_t mid_amp = map(buckets[2], 0, 255, 0, ((LED_COUNT / 3) * 2));
+  uint16_t bass_amp = map(buckets[0], 0, 255, 0, ((LED_COUNT / 10) * 2));
+  uint16_t mid_amp = map(buckets[2], 0, 255, 0, ((LED_COUNT / 10) * 2));
   uint16_t low_amp = map(buckets[3], 0, 255, 0, (LED_COUNT / 2));
   uint16_t high_amp = map(buckets[4], 0, 255, 0, (LED_COUNT / 2));
-  uint16_t bril_amp = map(buckets[5], 0, 255, 0, (LED_COUNT / 2));
-  uint16_t air_amp = map(buckets[6], 0, 255, 0, (LED_COUNT / 2));
+  uint16_t bril_amp = map(buckets[5], 0, 255, 0, LED_COUNT);
+  uint16_t air_amp = map(buckets[6], 0, 255, 0, LED_COUNT);
 
   uint16_t bass_start = middle - bass_size;
   uint16_t bass_stop = middle + bass_size;
 
-  uint16_t mid_start = middle - mid_size;
-  uint16_t mid_stop = middle + mid_size;
+  uint16_t mid_start = bass_start - mid_size;
+  uint16_t mid_stop = bass_stop + mid_size;
 
   ledset.fadeToBlackBy(48);
   // ledset.fadeLightBy(48);
 
+  // CRGBPalette16 colPal = bhw1_05_gp;
+  // CRGBPalette16 colPal = Paired_07_gp;  // bhw1_05_gp
+  // CRGBPalette16 colPal = Rainbow_gp;  // bhw1_05_gp
+  // CRGBPalette256 colPal = Sunset_Real_gp;
+  CRGBPalette256 palettes[6] = {RdYlBu_gp, Paired_07_gp, bhw1_05_gp,
+                                summer_gp, gr65_hult_gp, Sunset_Real_gp};
+
+  EVERY_N_SECONDS(30) {
+    Serial.printf("  - effect Gradient #: %i\n", j);
+    colPal = palettes[j];
+    j = (j < 5) ? j + 1 : 0;
+  }
+
+  uint8_t STEP = 48;
+  uint8_t RAND = 32;
+
   for (int i = 0; i < high_amp; i++) {
     uint16_t pos = random16(LED_COUNT);
-    leds[pos] = CHSV(96 + random8(16), 255, buckets[4]);
+    // leds[pos] = CHSV(96 + random8(16), 255, buckets[4]);
+    leds[pos] = ColorFromPalette(colPal, 223 + random8(RAND));
   }
 
   for (int i = 0; i < bril_amp; i++) {
     uint16_t pos = random16(LED_COUNT);
-    leds[pos] = CHSV(128 + random8(16), 255, buckets[5]);
+    // leds[pos] = CHSV(128 + random8(16), 255, buckets[5]);
+    leds[pos] = ColorFromPalette(colPal, 192 + random8(RAND));
   }
 
   for (int i = 0; i < air_amp; i++) {
     uint16_t pos = random16(LED_COUNT);
-    leds[pos] = CHSV(192 + random8(16), 128, buckets[6]);
+    // leds[pos] = CHSV(192 + random8(16), 128, buckets[6]);
+    leds[pos] = ColorFromPalette(colPal, 144 + random8(RAND));
   }
 
   for (int i = 0; i < low_amp; i++) {
     uint16_t pos = random16(LED_COUNT);
-    leds[pos] = CHSV(144 + random8(16), 255, buckets[3]);
+    leds[pos] = ColorFromPalette(colPal, 96 + random8(RAND));
+    // leds[pos] = CHSV(144 + random8(16), 255, buckets[3]);
   }
 
   for (int i = 0; i < mid_amp; i++) {
     uint16_t pos = random16(mid_start, mid_stop);
-    leds[pos] = CHSV(24 + random8(32), 255, buckets[2]);
+    // leds[pos] = CHSV(24 + random8(32), 255, buckets[2]);
+    leds[pos] = ColorFromPalette(colPal, 48 + random8(RAND));
   }
 
   for (int i = 0; i < bass_amp; i++) {
     uint16_t pos = random16(bass_start, bass_stop);
-    leds[pos] = CHSV(248 + random8(16), 255, buckets[0]);
+    // leds[pos] = CHSV(248 + random8(16), 255, buckets[0]);
+    leds[pos] = ColorFromPalette(colPal, 0 + random8(RAND));
   }
 }
 

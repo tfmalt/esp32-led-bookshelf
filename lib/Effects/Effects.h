@@ -46,6 +46,7 @@ class Effects {
   void effectVUMeter();
   void effectPride();
   void effectColorloop();
+  void effectGradient();
   void effectWalkingRainbow();
   void effectMusicDancer();
   void effectConfetti();
@@ -60,6 +61,7 @@ class Effects {
     BPM,
     GlitterRainbow,
     Rainbow,
+    Gradient,
     RainbowByShelf,
     Juggle,
     Sinelon,
@@ -77,7 +79,16 @@ class Effects {
   Command currentCommandType;
   Effect currentEffectType;
   ulong commandStart = 0;
-  Effects();
+  Effects() {
+    this->currentCommand = &Effects::cmdEmpty;
+    this->currentEffect = &Effects::cmdEmpty;
+
+    this->currentCommandType = Command::None;
+    this->currentEffectType = Effect::NullEffect;
+  };
+
+  void setup();
+
   void setCurrentCommand(Command cmd);
   void setCurrentEffect(String effect);
   void setCurrentEffect(Effect effect);

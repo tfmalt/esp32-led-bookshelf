@@ -37,6 +37,9 @@ uint16_t commandFrameCount = 0;
 ulong commandStart = 0;
 uint8_t updateProgress = 0;
 
+// ========================================================================
+// FastLED Setup
+// ========================================================================
 // Function that does the actual fast led setup on start.
 // Run by arduino setup function.
 void setupFastLED() {
@@ -50,7 +53,6 @@ void setupFastLED() {
   Serial.printf("  - type: SK9822, data: %i, clock: %i.\n", LED_DATA,
                 LED_CLOCK);
 #endif
-
   FastLED
       .addLeds<LED_TYPE, LED_DATA, LED_CLOCK, LED_COLOR_ORDER,
                DATA_RATE_MHZ(12)>(leds, LED_COUNT)
@@ -76,6 +78,7 @@ void setupFastLED() {
   FastLED.setBrightness(currentState.state ? currentState.brightness : 0);
 
   // effects.setFPS(FPS);
+  effects.setup();
   effects.setLightStateController(&lightState);
   effects.setLeds(leds, LED_COUNT);
   effects.setCurrentEffect(currentState.effect);
@@ -83,6 +86,9 @@ void setupFastLED() {
 }
 // END OF setupFastLED
 
+// ========================================================================
+// Arduino OTA Setup
+// ========================================================================
 uint8_t OTA_HUE = 64;
 void setupArduinoOTA() {
   ArduinoOTA.setPort(3232);
