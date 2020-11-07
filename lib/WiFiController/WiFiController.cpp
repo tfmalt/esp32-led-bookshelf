@@ -1,3 +1,4 @@
+#ifdef IS_ESP32
 #include "WiFiController.h"
 // #include <WiFiClientSecure.h>
 #include <LedshelfConfig.h>
@@ -131,3 +132,5 @@ void WiFiController::handleEvent(WiFiEvent_t event) {
       break;
   }
 }
+
+#endif  // IS_ESP32

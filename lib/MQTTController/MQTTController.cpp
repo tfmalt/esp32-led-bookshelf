@@ -1,4 +1,5 @@
 
+#ifdef IS_ESP32
 #include "MQTTController.h"
 
 #include <FastLED.h>
@@ -293,3 +294,4 @@ void MQTTController::publishStatus() {
 }
 
 // Trying to create a global object
+#endif  // IS_ESP32

@@ -6,8 +6,10 @@
 #include "LightStateController.h"
 
 #include <ArduinoJson.h>
+#ifdef IS_ESP32
 #include <FS.h>
 #include <SPIFFS.h>
+#endif
 
 LightStateController::LightStateController() {
   Color defaultColor = {0};
@@ -35,6 +37,7 @@ LightStateController &LightStateController::setCurrentState(
 
 uint8_t LightStateController::initialize() {
   currentState = defaultState;
+#ifdef IS_ESP32
 #ifdef DEBUG
   Serial.printf("DEBUG: Reading in '%s'\n", stateFile);
 #endif
@@ -68,26 +71,27 @@ uint8_t LightStateController::initialize() {
   currentState.color.s = (float)state["color"]["s"];
 
   file.close();
+#endif  // IS_ESP32
   return 0;
 }
 
 LightState &LightStateController::parseNewState(byte *payload) {
-  try {
-    LightState newState = getLightStateFromPayload(payload);
-    currentState = newState;
-  } catch (LightState errState) {
-    String error = "Unknown";
-    if (errState.status.status == LIGHT_MQTT_JSON_FAILED) {
-      error = "Parsing of json failed.";
-    } else if (errState.status.status == LIGHT_MQTT_JSON_NO_STATE) {
-      error = "Did not get correct state parameter in Json.";
-    }
-
-#ifdef DEBUG
-    Serial.printf("ERROR: parsing of new state threw error: %s\n",
-                  error.c_str());
-#endif
-  }
+  // try {
+  LightState newState = getLightStateFromPayload(payload);
+  currentState = newState;
+  // } catch (LightState errState) {
+  //   String error = "Unknown";
+  //   if (errState.status.status == LIGHT_MQTT_JSON_FAILED) {
+  //     error = "Parsing of json failed.";
+  //   } else if (errState.status.status == LIGHT_MQTT_JSON_NO_STATE) {
+  //     error = "Did not get correct state parameter in Json.";
+  //   }
+  //
+  // #ifdef DEBUG
+  //     Serial.printf("ERROR: parsing of new state threw error: %s\n",
+  //                   error.c_str());
+  // #endif
+  //   }
 
 #ifdef DEBUG
   Serial.println("  - Saving current state to file.");
@@ -157,19 +161,15 @@ LightState LightStateController::getLightStateFromPayload(byte *payload) {
   if (error) {
     newState.status.status = LIGHT_MQTT_JSON_FAILED;
     newState.status.success = false;
-    throw newState;
+    // throw newState;
+    Serial.printf("ERROR: Got error reading state from payload: %i\n", error);
   }
-
-#ifdef DEBUG
-  // char output[256] = "";
-  Serial.println("DEBUG: JSON:");
-  serializeJson(data, Serial);
-#endif
 
   if (!data.containsKey("state")) {
     newState.status.status = LIGHT_MQTT_JSON_NO_STATE;
     newState.status.success = false;
-    throw newState;
+    // throw newState;
+    Serial.println("ERROR: There was no state attribute in json");
   }
 
   newState.state = data["state"] == "ON" ? true : false;
@@ -261,11 +261,7 @@ void LightStateController::serializeCurrentState(char *output, int length) {
 // }
 
 uint8_t LightStateController::saveCurrentState() {
-  // StaticJsonDocument<256> doc;
-  // JsonObject &object = jsonBuffer.createObject();
-  // JsonObject &color = jsonBuffer.createObject();
-  // JsonObject &current = createCurrentStateJsonObject(object, color);
-
+#ifdef IS_ESP32
   char json[256];
   serializeCurrentState(json, 256);
 
@@ -273,6 +269,8 @@ uint8_t LightStateController::saveCurrentState() {
 
   file.println(json);
   file.close();
+#endif
+
   return LIGHT_STATEFILE_WROTE_SUCCESS;
 }
 

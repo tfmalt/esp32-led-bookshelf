@@ -1,12 +1,15 @@
 /*
- * A first attempt at writing code for ESP32.
- * This is going to be a led light controller for lights on my daughters book
- * shelf.
+ * A LED strip controller made to work with ESP32 and Teensy 4.0
  *
- * - Uses MQTT over TLS to talk to a MQTT broker.
+ * Currently a farily custom firmware tailored to work with various decoration
+ * lights. Mainly for my daughters book shelf and bed lights.
+ *
+ * - Uses MQTT to talk to a MQTT broker.
  * - Implementes the mqtt_json interface to get commands from a home assistant
  *   server. (https://home-assistant.io)
  * - Uses SPIFFS to store configuration and separate configuration from firmware
+ * - Connects to a 3.5mm minijack and uses FFT to create audio responsive light
+ * displays.
  *
  * MIT License
  *
@@ -14,13 +17,16 @@
  */
 
 #include <Arduino.h>
-#include <ArduinoOTA.h>
 #include <Effects.h>
 #include <FastLED.h>
 #include <LedshelfConfig.h>
 #include <LightStateController.h>
+
+#ifdef IS_ESP32
+#include <ArduinoOTA.h>
 #include <MQTTController.h>
 #include <WiFiController.h>
+#endif
 
 FASTLED_USING_NAMESPACE
 
@@ -29,8 +35,11 @@ CRGBArray<LED_COUNT> leds;
 LedshelfConfig config;
 LightStateController lightState;
 Effects effects;
+
+#ifdef IS_ESP32
 WiFiController wifiCtrl(config);
 MQTTController mqttCtrl(VERSION, config, wifiCtrl, lightState, effects);
+#endif
 
 uint16_t commandFrames = FPS;
 uint16_t commandFrameCount = 0;
@@ -89,6 +98,7 @@ void setupFastLED() {
 // ========================================================================
 // Arduino OTA Setup
 // ========================================================================
+#ifdef IS_ESP32
 uint8_t OTA_HUE = 64;
 void setupArduinoOTA() {
   ArduinoOTA.setPort(3232);
@@ -153,6 +163,7 @@ void setupArduinoOTA() {
         mqttCtrl.publishInformation(message.c_str());
       });
 }
+#endif  // IS_ESP32
 
 /* ======================================================================
  * SETUP
@@ -165,11 +176,14 @@ void setup() {
 #endif
 
   config.setup();
+
+#ifdef IS_ESP32
   wifiCtrl.setup();
   wifiCtrl.connect();
   mqttCtrl.setup();
 
   setupArduinoOTA();
+#endif  // IS_ESP32
 
   delay(2000);
 
@@ -184,28 +198,40 @@ unsigned long timetowait = 1000 / FPS;
 unsigned long previoustime = 0;
 
 void loop() {
+#ifdef IS_ESP32
   mqttCtrl.checkConnection();
+#endif
 
   if (effects.currentCommandType == Effects::Command::FirmwareUpdate) {
+#ifdef IS_ESP32
     ArduinoOTA.handle();
     if (millis() > (effects.commandStart + 30000)) {
       mqttCtrl.publishInformation("No update started for 180s. Rebooting.");
       delay(1000);
       ESP.restart();
     }
+#else
+#ifdef DEBUG
+    Serial.println(
+        "Command set to firmware update, but not running on OTA compatible "
+        "board.");
+#endif  // DEBUG
+    effects.setCurrentCommand(Effects::Command::None);
+#endif
   } else {
     effects.runCurrentCommand();
     effects.runCurrentEffect();
-
+#ifdef IS_ESP32
     EVERY_N_SECONDS(60) { mqttCtrl.publishStatus(); }
 
 #ifdef DEBUG
     EVERY_N_SECONDS(60) {
 #else
     EVERY_N_SECONDS(300) {
-#endif
+#endif  // DEBUG
       mqttCtrl.publishInformationData();
     }
+#endif  // IS_ESP32
   }
 #ifdef DEBUG
   EVERY_N_SECONDS(10) {

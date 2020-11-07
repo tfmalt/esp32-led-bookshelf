@@ -6,30 +6,28 @@
 #define WiFiController_h
 
 #include <Arduino.h>
+#ifdef IS_ESP32
 #include <WiFi.h>
+#endif
 // #include <WiFiClientSecure.h>
 #include <LedshelfConfig.h>
 
-class WiFiController
-{
-public:
-    WiFiController(LedshelfConfig &c) : config(c)
-    {
-        WiFi.disconnect(true);
-    };
+class WiFiController {
+ public:
+  WiFiController(LedshelfConfig &c) : config(c) { WiFi.disconnect(true); };
 
-    void setup();
-    void connect();
-    void testOutput();
-    // WiFiClientSecure &getWiFiClient();
-    WiFiClient &getWiFiClient();
+  void setup();
+  void connect();
+  void testOutput();
+  // WiFiClientSecure &getWiFiClient();
+  WiFiClient &getWiFiClient();
 
-private:
-    // WiFiClientSecure wifiClient;
-    WiFiClient wifiClient;
-    LedshelfConfig &config;
+ private:
+  // WiFiClientSecure wifiClient;
+  WiFiClient wifiClient;
+  LedshelfConfig &config;
 
-    void handleEvent(WiFiEvent_t event);
+  void handleEvent(WiFiEvent_t event);
 };
 
-#endif // WiFiController_h
+#endif  // WiFiController_h

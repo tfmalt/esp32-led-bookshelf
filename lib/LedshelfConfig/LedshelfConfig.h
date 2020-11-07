@@ -6,7 +6,9 @@
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
+#ifdef IS_ESP32
 #include <SPIFFS.h>
+#endif
 
 class LedshelfConfig {
  public:
@@ -31,12 +33,14 @@ class LedshelfConfig {
   LedshelfConfig(){};
 
   void setup() {
+#ifdef IS_ESP32
     if (!SPIFFS.begin()) {
       ESP.restart();
       return;
     }
 
     parseConfigFile();
+#endif
   }
 
   void stateTopic(char *topic) {
@@ -76,10 +80,11 @@ class LedshelfConfig {
   }
 
  private:
+#ifdef IS_ESP32
   void parseConfigFile() {
 #ifdef DEBUG
     Serial.printf("  - Parsing config file: %s ... ", CONFIG_FILE);
-#endif
+#endif  // DEBUG
 
     File file = SPIFFS.open(CONFIG_FILE, "r");
 
@@ -120,8 +125,9 @@ class LedshelfConfig {
 
 #ifdef DEBUG
     Serial.println("Done");
-#endif
+#endif  // DEBUG
   }
+#endif  // IS_ESP32
 
   /**
    * Reads the TLS CA Root Certificate from file.
