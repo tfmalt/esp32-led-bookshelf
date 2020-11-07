@@ -2,13 +2,9 @@
 #define Effects_h
 
 #include <Arduino.h>
-#include <ArduinoOTA.h>
+// #include <ArduinoOTA.h>
 #include <FastLED.h>
 #include <LightStateController.h>
-
-#ifdef FFT_ACTIVE
-#include <arduinoFFT.h>
-#endif
 
 class Effects {
  private:
@@ -24,10 +20,10 @@ class Effects {
   uint16_t commandFrameCount = 0;
   uint16_t commandFrames = 0;
 
-  unsigned long sampleDelay();
-  void fftComputeSampleset();
-  void fftFillBuckets();
-  void fftFillBucketsSimple();
+  // unsigned long sampleDelay();
+  // void fftComputeSampleset();
+  // void fftFillBuckets();
+  // void fftFillBucketsSimple();
   void cmdEmpty();
   void cmdSetBrightness();
   void cmdFadeTowardColor();

@@ -1,20 +1,14 @@
 
 #include "Effects.h"
 
-#ifdef FFT_ACTIVE
-#define SAMPLING_FREQUENCY 40000
-#define FFT_SAMPLES 1024
-#define FFT_BUCKETS 7
+#if defined(FFT_ACTIVE) && defined(IS_TEENSY)
+#include <AudioFFT.h>
+AudioFFT fft;
+#endif
 
-#include <driver/adc.h>
-
-double vReal[FFT_SAMPLES];
-double vImag[FFT_SAMPLES];
-
-int buckets[FFT_BUCKETS] = {0};
-int segment = LED_COUNT / FFT_BUCKETS;
-
-arduinoFFT FFT = arduinoFFT();
+#if defined(FFT_ACTIVE) && defined(IS_ESP32)
+#include <Esp32FFT.h>
+Esp32FFT fft;
 #endif
 
 DEFINE_GRADIENT_PALETTE(Paired_07_gp){
@@ -47,11 +41,12 @@ void Effects::setup() {
 #ifdef DEBUG
   Serial.println("  - Running Effects Setup");
 #endif
-#ifdef FFT_ACTIVE
-  analogReadResolution(12);
-  analogSetCycles(8);
-  analogSetSamples(1);
-  analogSetAttenuation(ADC_11db);
+#if defined(FFT_ACTIVE) && defined(IS_ESP32)
+  fft.setup();
+//   analogReadResolution(12);
+//   analogSetCycles(8);
+//   analogSetSamples(1);
+//   analogSetAttenuation(ADC_11db);
 #endif
 }
 
@@ -264,6 +259,9 @@ void Effects::fadeTowardColor(CRGB* L, uint16_t N, const CRGB& bgColor,
   }
 }
 
+/**
+ * command tells strip to Fade towards a color
+ */
 void Effects::cmdFadeTowardColor() {
   LightState state = lightState->getCurrentState();
   CRGB targetColor(state.color.r, state.color.g, state.color.b);
@@ -271,13 +269,27 @@ void Effects::cmdFadeTowardColor() {
   fadeTowardColor(leds, numberOfLeds, targetColor, 2);
 }
 
+/**
+ * setLeds
+ */
 void Effects::setLeds(CRGB* l, const uint16_t& n) {
   numberOfLeds = n;
   leds = l;
 }
 
-Effects::Effect Effects::getCurrentEffect() { return currentEffectType; }
+/**
+ * Return current effect
+ *
+ * @return Effects::Effect current effect type
+ */
+Effects::Effect Effects::getCurrentEffect() {
+  // returns current effect
+  return currentEffectType;
+}
 
+/**
+ * Sets the start hue
+ */
 void Effects::setStartHue(float hue) {
   startHue = static_cast<uint8_t>(hue * (256.0 / 360.0));
   confettiHue = startHue;
@@ -287,296 +299,301 @@ void Effects::setStartHue(float hue) {
 // FFT Helper functions
 // ======================================================================
 
-unsigned long newtime = 0;
-unsigned long oldtime = 0;
-unsigned long sampling_period = round(1000000 * (1.0 / SAMPLING_FREQUENCY));
+// unsigned long newtime = 0;
+// unsigned long oldtime = 0;
+// unsigned long sampling_period = round(1000000 * (1.0 / SAMPLING_FREQUENCY));
 
-unsigned long Effects::sampleDelay() {
-  newtime = micros() - oldtime;
-  oldtime = newtime;
-
-  return (newtime + sampling_period);
-}
+// unsigned long Effects::sampleDelay() {
+//   newtime = micros() - oldtime;
+//   oldtime = newtime;
+//
+//   return (newtime + sampling_period);
+// }
 
 // 5 per second for 20 seconds
 
-#define AVG_MAX 200
-#define AVG_BASE 2047
-#define FFT_LOW_CUTOFF 32000
-#define FFT_HIGH_CUTOFF 320000
+// #define AVG_MAX 200
+// #define AVG_BASE 2047
+// #define FFT_LOW_CUTOFF 32000
+// #define FFT_HIGH_CUTOFF 320000
+//
+// uint16_t AVG_SAMP[AVG_MAX];
+// uint32_t AVG_CTR = 0;
+// double AMP_FACTOR = 1.00;
 
-uint16_t AVG_SAMP[AVG_MAX];
-uint32_t AVG_CTR = 0;
-double AMP_FACTOR = 1.00;
+// void Effects::fftComputeSampleset() {
+//   // unsigned long start = micros();
+//   uint16_t sample;
+//
+//   for (int i = 0; i < FFT_SAMPLES; i++) {
+//     sample = analogRead(FFT_INPUT_PIN);
+//
+//     EVERY_N_MILLIS(200) {
+//       AVG_SAMP[(AVG_CTR % AVG_MAX)] = sample;
+//       AVG_CTR++;
+//     }
+//
+//     int adjusted = (int)(sample * AMP_FACTOR);
+//     if (adjusted < 0) adjusted = 0;
+//     if (adjusted > 4095) adjusted = 4095;
+//
+//     vReal[i] = adjusted;
+//     vImag[i] = 0;
+//   }
+//   // unsigned long doneSamples = micros();
+//
+//   FFT.Windowing(vReal, FFT_SAMPLES, FFT_WIN_TYP_HAMMING, FFT_FORWARD);
+//   FFT.Compute(vReal, vImag, FFT_SAMPLES, FFT_FORWARD);
+//   FFT.ComplexToMagnitude(vReal, vImag, FFT_SAMPLES);
+//   // unsigned long doneCompute = micros();
+//
+//   EVERY_N_MILLIS(1000) {
+//     // Calculate average amplitude every 5 seconds.
+//     uint32_t avg_sum = 0;
+//     for (int i = 0; i < AVG_MAX; i++) {
+//       avg_sum += AVG_SAMP[i];
+//     }
+//
+//     double avg =
+//         (AVG_CTR > 200) ? avg_sum / (double)AVG_MAX : avg_sum /
+//         (double)AVG_CTR;
+//     AMP_FACTOR = (avg > 0) ? AVG_BASE / avg : 0;
+//
+// #ifdef DEBUG
+//     Serial.printf("Average: raw: %6i\t avg: %8.2f\tfac: %8.2f\tadj: %6i\n",
+//                   sample, avg, AMP_FACTOR, (int)(avg * AMP_FACTOR));
+// #endif
+//   }
+// }
 
-void Effects::fftComputeSampleset() {
-  // unsigned long start = micros();
-  uint16_t sample;
-
-  for (int i = 0; i < FFT_SAMPLES; i++) {
-    sample = analogRead(FFT_INPUT_PIN);
-
-    EVERY_N_MILLIS(200) {
-      AVG_SAMP[(AVG_CTR % AVG_MAX)] = sample;
-      AVG_CTR++;
-    }
-
-    int adjusted = (int)(sample * AMP_FACTOR);
-    if (adjusted < 0) adjusted = 0;
-    if (adjusted > 4095) adjusted = 4095;
-
-    vReal[i] = adjusted;
-    vImag[i] = 0;
-  }
-  // unsigned long doneSamples = micros();
-
-  FFT.Windowing(vReal, FFT_SAMPLES, FFT_WIN_TYP_HAMMING, FFT_FORWARD);
-  FFT.Compute(vReal, vImag, FFT_SAMPLES, FFT_FORWARD);
-  FFT.ComplexToMagnitude(vReal, vImag, FFT_SAMPLES);
-  // unsigned long doneCompute = micros();
-
-  EVERY_N_MILLIS(1000) {
-    // Calculate average amplitude every 5 seconds.
-    uint32_t avg_sum = 0;
-    for (int i = 0; i < AVG_MAX; i++) {
-      avg_sum += AVG_SAMP[i];
-    }
-
-    double avg =
-        (AVG_CTR > 200) ? avg_sum / (double)AVG_MAX : avg_sum / (double)AVG_CTR;
-    AMP_FACTOR = (avg > 0) ? AVG_BASE / avg : 0;
-
-#ifdef DEBUG
-    Serial.printf("Average: raw: %6i\t avg: %8.2f\tfac: %8.2f\tadj: %6i\n",
-                  sample, avg, AMP_FACTOR, (int)(avg * AMP_FACTOR));
-#endif
-  }
-}
-
-void Effects::fftFillBuckets() {
-  int next = 0;
-  int prev = 0;
-  int curr = 0;
-
-  // ====================================================================
-  // 0: Bass: 60 - 250 Hz
-  curr = (int)vReal[2];
-  next = (int)vReal[3];
-
-  if (next > (curr * 2.19)) curr = 0;
-
-  //  Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
-
-  curr -= FFT_LOW_CUTOFF;
-  if (curr < 0) curr = 0;
-
-  curr = constrain(curr, 0, FFT_HIGH_CUTOFF);
-  curr = map(curr, 0, FFT_HIGH_CUTOFF, 0, 255);
-
-  buckets[0] = (uint8_t)curr;
-
-  // ====================================================================
-  // 1: Low midrange: 250 - 500 Hz
-  curr = 0;
-  next = 0;
-  prev = (int)vReal[2];
-
-  for (int i = 3; i < 6; i++) {
-    curr = max((int)vReal[i], curr);
-  }
-
-  //   for (int i = 6; i < 11; i++) {
-  //     next = max((int)vReal[i], next);
-  //   }
-
-  if (prev > (curr * 0.47)) curr = 0;
-  // if (next > (curr * 0.4)) curr = 0;
-
-  //   Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
-  curr -= FFT_LOW_CUTOFF;
-  if (curr < 0) curr = 0;
-
-  curr = constrain(curr, 0, FFT_HIGH_CUTOFF);
-  curr = map(curr, 0, FFT_HIGH_CUTOFF, 0, 255);
-  buckets[1] = (uint8_t)curr;
-
-  // ====================================================================
-  // 2: Midrange: 500 - 1 kHz
-  // prev = 0;
-  curr = 0;
-  // next = 0;
-
-  // for (int i = 2; i < 6; i++) {
-  //   prev = max((int)vReal[i], prev);
-  // }
-  //
-  for (int i = 6; i < 12; i++) {
-    curr = (vReal[i] > curr) ? vReal[i] : curr;
-  }
-  //
-  //   for (int i = 11; i < 21; i++) {
-  //     next = (vReal[i] > next) ? vReal[i] : next;
-  //   }
-  //
-  //   if (next > (curr * 0.36)) curr = 0;
-  //   if (prev > (curr * 2.68)) curr = 0;
-
-  // Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
-  curr -= FFT_LOW_CUTOFF;
-  if (curr < 0) curr = 0;
-
-  curr = constrain(curr, 0, FFT_HIGH_CUTOFF);
-  curr = map(curr, 0, FFT_HIGH_CUTOFF, 0, 255);
-
-  buckets[2] = (uint8_t)curr;
-
-  // ====================================================================
-  // 3: Midrange: 1 - 2 kHz
-  curr = 0;
-  // next = 0;
-  // prev = 0;
-  //
-  //   for (int i = 2; i < 11; i++) {
-  //     prev = max((int)vReal[i], prev);
-  //   }
-  //
-  for (int i = 12; i < 24; i++) {
-    curr = max((int)vReal[i], curr);
-  }
-  //
-  //   for (int i = 21; i < 41; i++) {
-  //     next = max((int)vReal[i], next);
-  //   }
-  //
-  //   if (next > (curr * 0.29)) curr = 0;
-  //   if (prev > (curr * 2.84)) curr = 0;
-
-  //  Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
-  curr -= FFT_LOW_CUTOFF;
-  if (curr < 0) curr = 0;
-
-  curr = constrain(curr, 0, FFT_HIGH_CUTOFF);
-  curr = map(curr, 0, FFT_HIGH_CUTOFF, 0, 255);
-
-  buckets[3] = (uint8_t)curr;
-
-  // ====================================================================
-  // 4: Upper Midrange: 2 - 4 kHz
-  curr = 0;
-  // next = 0;
-  //
-  //   for (int i = 11; i < 21; i++) {
-  //     prev = max((int)vReal[i], prev);
-  //   }
-  //
-  for (int i = 24; i < 48; i++) {
-    curr = max((int)vReal[i], curr);
-  }
-  //
-  //   for (int i = 41; i < 80; i++) {
-  //     next = max((int)vReal[i], next);
-  //   }
-  //
-  //   if (prev > (curr * 3.74)) curr = 0;
-  //   if (next > (curr * 0.30)) curr = 0;
-
-  //  Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
-  curr -= FFT_LOW_CUTOFF;
-  if (curr < 0) curr = 0;
-
-  curr = constrain(curr, 0, FFT_HIGH_CUTOFF);
-  curr = map(curr, 0, FFT_HIGH_CUTOFF, 0, 255);
-
-  buckets[4] = (uint8_t)curr;
-
-  // ====================================================================
-  //   // 5: precence: 4 - 6 kHz
-  curr = 0;
-  // next = 0;
-  //
-  //   for (int i = 21; i < 40; i++) {
-  //     prev = max((int)vReal[i], prev);
-  //   }
-  //
-  for (int i = 48; i < 72; i++) {
-    curr = max((int)vReal[i], curr);
-  }
-  //
-  //   for (int i = 60; i < 240; i++) {
-  //     next = max((int)vReal[i], next);
-  //   }
-  //
-  //   if (prev > (curr * 1.10)) curr = 0;
-  //   if (next > (curr * 0.86)) curr = 0;
-
-  //   Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
-  curr -= FFT_LOW_CUTOFF;
-  if (curr < 0) curr = 0;
-
-  curr = constrain(curr, 0, FFT_HIGH_CUTOFF);
-  curr = map(curr, 0, FFT_HIGH_CUTOFF, 0, 255);
-
-  buckets[5] = (uint8_t)curr;
-
-  // ====================================================================
-  // 6: Brilliance: 6 - 20 kHz kHz
-  curr = 0;
-  // next = 0;
-  //
-  //   for (int i = 40; i < 60; i++) {
-  //     prev = max((int)vReal[i], prev);
-  //   }
-  //
-  for (int i = 71; i < 240; i++) {
-    curr = max((int)vReal[i], curr);
-  }
-  //
-  //   if (prev > (curr * 1.30)) curr = 0;
-
-  // Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
-  curr -= FFT_LOW_CUTOFF;
-  if (curr < 0) curr = 0;
-
-  curr = constrain(curr, 0, FFT_HIGH_CUTOFF);
-  curr = map(curr, 0, FFT_HIGH_CUTOFF, 0, 255);
-
-  buckets[6] = (uint8_t)curr;
-
-  // ====================================================================
-  // Debug printing:
-  // ====================================================================
-  // int FROM = 70;
-  // int TO = 175;
-  // int MOD = 2;
-  //
-  //   for (int i = FROM; i < TO; i++) {
-  //     if (i % MOD == 0) Serial.printf("%6i\t", (int)vReal[i]);
-  //   }
-  //   Serial.println();
-  //
-  //   EVERY_N_MILLIS(1000) {
-  //     Serial.println();
-  //     Serial.printf("%6s\t%6s\t%6s\t", "prev", "curr", "next");
-  //
-  //     for (int i = FROM; i < TO; i++) {
-  //       if (i % MOD == 0) Serial.printf("%6i\t", i);
-  //     }
-  //     Serial.println();
-  //     for (int i = FROM; i < (TO + 3); i++) {
-  //       if (i % MOD == 0) Serial.printf("------\t");
-  //     }
-  //     Serial.println();
-  //   }
-}
+// void Effects::fftFillBuckets() {
+//   int next = 0;
+//   int prev = 0;
+//   int curr = 0;
+//
+//   // ====================================================================
+//   // 0: Bass: 60 - 250 Hz
+//   curr = (int)vReal[2];
+//   next = (int)vReal[3];
+//
+//   if (next > (curr * 2.19)) curr = 0;
+//
+//   //  Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
+//
+//   curr -= FFT_LOW_CUTOFF;
+//   if (curr < 0) curr = 0;
+//
+//   curr = constrain(curr, 0, FFT_HIGH_CUTOFF);
+//   curr = map(curr, 0, FFT_HIGH_CUTOFF, 0, 255);
+//
+//   buckets[0] = (uint8_t)curr;
+//
+//   // ====================================================================
+//   // 1: Low midrange: 250 - 500 Hz
+//   curr = 0;
+//   next = 0;
+//   prev = (int)vReal[2];
+//
+//   for (int i = 3; i < 6; i++) {
+//     curr = max((int)vReal[i], curr);
+//   }
+//
+//   //   for (int i = 6; i < 11; i++) {
+//   //     next = max((int)vReal[i], next);
+//   //   }
+//
+//   if (prev > (curr * 0.47)) curr = 0;
+//   // if (next > (curr * 0.4)) curr = 0;
+//
+//   //   Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
+//   curr -= FFT_LOW_CUTOFF;
+//   if (curr < 0) curr = 0;
+//
+//   curr = constrain(curr, 0, FFT_HIGH_CUTOFF);
+//   curr = map(curr, 0, FFT_HIGH_CUTOFF, 0, 255);
+//   buckets[1] = (uint8_t)curr;
+//
+//   // ====================================================================
+//   // 2: Midrange: 500 - 1 kHz
+//   // prev = 0;
+//   curr = 0;
+//   // next = 0;
+//
+//   // for (int i = 2; i < 6; i++) {
+//   //   prev = max((int)vReal[i], prev);
+//   // }
+//   //
+//   for (int i = 6; i < 12; i++) {
+//     curr = (vReal[i] > curr) ? vReal[i] : curr;
+//   }
+//   //
+//   //   for (int i = 11; i < 21; i++) {
+//   //     next = (vReal[i] > next) ? vReal[i] : next;
+//   //   }
+//   //
+//   //   if (next > (curr * 0.36)) curr = 0;
+//   //   if (prev > (curr * 2.68)) curr = 0;
+//
+//   // Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
+//   curr -= FFT_LOW_CUTOFF;
+//   if (curr < 0) curr = 0;
+//
+//   curr = constrain(curr, 0, FFT_HIGH_CUTOFF);
+//   curr = map(curr, 0, FFT_HIGH_CUTOFF, 0, 255);
+//
+//   buckets[2] = (uint8_t)curr;
+//
+//   // ====================================================================
+//   // 3: Midrange: 1 - 2 kHz
+//   curr = 0;
+//   // next = 0;
+//   // prev = 0;
+//   //
+//   //   for (int i = 2; i < 11; i++) {
+//   //     prev = max((int)vReal[i], prev);
+//   //   }
+//   //
+//   for (int i = 12; i < 24; i++) {
+//     curr = max((int)vReal[i], curr);
+//   }
+//   //
+//   //   for (int i = 21; i < 41; i++) {
+//   //     next = max((int)vReal[i], next);
+//   //   }
+//   //
+//   //   if (next > (curr * 0.29)) curr = 0;
+//   //   if (prev > (curr * 2.84)) curr = 0;
+//
+//   //  Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
+//  curr -= FFT_LOW_CUTOFF;
+//  if (curr < 0) curr = 0;
+//
+//  curr = constrain(curr, 0, FFT_HIGH_CUTOFF);
+//  curr = map(curr, 0, FFT_HIGH_CUTOFF, 0, 255);
+//
+//  buckets[3] = (uint8_t)curr;
+//
+//  // ====================================================================
+//  // 4: Upper Midrange: 2 - 4 kHz
+//  curr = 0;
+//  // next = 0;
+//  //
+//  //   for (int i = 11; i < 21; i++) {
+//  //     prev = max((int)vReal[i], prev);
+//  //   }
+//  //
+//  for (int i = 24; i < 48; i++) {
+//    curr = max((int)vReal[i], curr);
+//  }
+//  //
+//  //   for (int i = 41; i < 80; i++) {
+//  //     next = max((int)vReal[i], next);
+//  //   }
+//  //
+//  //   if (prev > (curr * 3.74)) curr = 0;
+//  //   if (next > (curr * 0.30)) curr = 0;
+//
+//  //  Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
+//  curr -= FFT_LOW_CUTOFF;
+//  if (curr < 0) curr = 0;
+//
+//  curr = constrain(curr, 0, FFT_HIGH_CUTOFF);
+//  curr = map(curr, 0, FFT_HIGH_CUTOFF, 0, 255);
+//
+//  buckets[4] = (uint8_t)curr;
+//
+//  // ====================================================================
+//  //   // 5: precence: 4 - 6 kHz
+//  curr = 0;
+//  // next = 0;
+//  //
+//  //   for (int i = 21; i < 40; i++) {
+//  //     prev = max((int)vReal[i], prev);
+//  //   }
+//  //
+//  for (int i = 48; i < 72; i++) {
+//    curr = max((int)vReal[i], curr);
+//  }
+//  //
+//  //   for (int i = 60; i < 240; i++) {
+//  //     next = max((int)vReal[i], next);
+//  //   }
+//  //
+//  //   if (prev > (curr * 1.10)) curr = 0;
+//  //   if (next > (curr * 0.86)) curr = 0;
+//
+//  //   Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
+//  curr -= FFT_LOW_CUTOFF;
+//  if (curr < 0) curr = 0;
+//
+//  curr = constrain(curr, 0, FFT_HIGH_CUTOFF);
+//  curr = map(curr, 0, FFT_HIGH_CUTOFF, 0, 255);
+//
+//  buckets[5] = (uint8_t)curr;
+//
+//   // ====================================================================
+//   // 6: Brilliance: 6 - 20 kHz kHz
+//   curr = 0;
+//   // next = 0;
+//   //
+//   //   for (int i = 40; i < 60; i++) {
+//   //     prev = max((int)vReal[i], prev);
+//   //   }
+//   //
+//   for (int i = 71; i < 240; i++) {
+//     curr = max((int)vReal[i], curr);
+//   }
+//   //
+//   //   if (prev > (curr * 1.30)) curr = 0;
+//
+//   // Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
+//   curr -= FFT_LOW_CUTOFF;
+//   if (curr < 0) curr = 0;
+//
+//   curr = constrain(curr, 0, FFT_HIGH_CUTOFF);
+//   curr = map(curr, 0, FFT_HIGH_CUTOFF, 0, 255);
+//
+//   buckets[6] = (uint8_t)curr;
+//
+//   // ====================================================================
+//   // Debug printing:
+//   // ====================================================================
+//   // int FROM = 70;
+//   // int TO = 175;
+//   // int MOD = 2;
+//   //
+//   //   for (int i = FROM; i < TO; i++) {
+//   //     if (i % MOD == 0) Serial.printf("%6i\t", (int)vReal[i]);
+//   //   }
+//   //   Serial.println();
+//   //
+//   //   EVERY_N_MILLIS(1000) {
+//   //     Serial.println();
+//   //     Serial.printf("%6s\t%6s\t%6s\t", "prev", "curr", "next");
+//   //
+//   //     for (int i = FROM; i < TO; i++) {
+//   //       if (i % MOD == 0) Serial.printf("%6i\t", i);
+//   //     }
+//   //     Serial.println();
+//   //     for (int i = FROM; i < (TO + 3); i++) {
+//   //       if (i % MOD == 0) Serial.printf("------\t");
+//   //     }
+//   //     Serial.println();
+//   //   }
+// }
 
 // =====================================================================
 // EFFECTS
 // =====================================================================
-void Effects::effectRainbow() { fill_rainbow(leds, numberOfLeds, startHue, 2); }
+void Effects::effectRainbow() {
+  // fills the leds with rainbow colors
+  fill_rainbow(leds, numberOfLeds, startHue, 2);
+}
 
 uint16_t GRAD_INDEX = 0;
 CRGBPalette256 pal = Sunset_Real_gp;
 uint8_t j = 0;
+
 void Effects::effectGradient() {
   CRGBPalette256 palettes[6] = {RdYlBu_gp, Paired_07_gp, bhw1_05_gp,
                                 summer_gp, gr65_hult_gp, Sunset_Real_gp};
@@ -716,31 +733,27 @@ void Effects::effectColorloop() {
  */
 void Effects::effectVUMeter() {
   CRGBSet ledset(leds, LED_COUNT);
-  // ledset(0, FFT_BUCKETS * segment) = CRGB::Black;
 
   EVERY_N_MILLIS(1000 / 25) {
-    // Serial.print(micros());
-    // Serial.print(" --\t");
-
     ledset(0, LED_COUNT).fadeToBlackBy(96);
-    // ledset(0, LED_COUNT) = CRGB::Black;
-    fftComputeSampleset();
-    fftFillBuckets();
-
-    // Colors
-    uint32_t colors[FFT_BUCKETS] = {CRGB::Red,   CRGB::OrangeRed, CRGB::Orange,
-                                    CRGB::Green, CRGB::Aqua,      CRGB::Blue,
-                                    CRGB::Violet};
+    std::array<uint8_t, FFT_BUCKETS> buckets = fft.getSampleSet();
 
     // ==================================================================
     // Paint the colors
+    CRGBPalette16 palette = Rainbow_gp;
+    uint8_t segment = LED_COUNT / FFT_BUCKETS;  // how many leds per bucket
+    uint8_t step = 256 / FFT_BUCKETS;    // How many colors to jump per segment
+    uint8_t increment = step / segment;  // colors to increment inside segment
+
     for (int i = 0; i < FFT_BUCKETS; i++) {
       // map the value into number of leds to light.
       uint8_t count = map(buckets[i], 0, 255, 0, segment);
-      if (count >= 1) {
-        ledset(i * segment, (i * segment) + count) = colors[i];
+
+      if (count > 0) {
+        fill_palette(ledset(i * segment, i * segment + count), count, i * step,
+                     increment, palette, buckets[i], LINEARBLEND);
       }
-      buckets[i] = 0;
+      // buckets[i] = 0;
     }
   }
 }
@@ -750,8 +763,9 @@ void Effects::effectMusicDancer() {
   CRGBSet ledset(leds, LED_COUNT);
   // ledset(0, LED_COUNT) = CRGB::Black;
 
-  fftComputeSampleset();
-  fftFillBuckets();
+  std::array<uint8_t, FFT_BUCKETS> buckets = fft.getSampleSet();
+  //   fftComputeSampleset();
+  //   fftFillBuckets();
 
   uint16_t middle = LED_COUNT / 2;
 
@@ -788,7 +802,6 @@ void Effects::effectMusicDancer() {
     j = (j < 5) ? j + 1 : 0;
   }
 
-  uint8_t STEP = 48;
   uint8_t RAND = 32;
 
   for (int i = 0; i < high_amp; i++) {
@@ -836,35 +849,36 @@ void Effects::effectFrequencies() {
 
   ledset(0, LED_COUNT) = CRGB::Black;
 
-  for (int i = 0; i < FFT_SAMPLES; i++) {
-    // newtime = micros() - oldtime;
-    // oldtime = newtime;
-
-    vReal[i] = analogRead(FFT_INPUT_PIN);
-    vImag[i] = 0;
-
-    while (micros() < sampleDelay())
-      ;
-  }
-
-  // FFT
-  FFT.Windowing(vReal, FFT_SAMPLES, FFT_WIN_TYP_HAMMING, FFT_FORWARD);
-  FFT.Compute(vReal, vImag, FFT_SAMPLES, FFT_FORWARD);
-  FFT.ComplexToMagnitude(vReal, vImag, FFT_SAMPLES);
-
-  for (int i = 2; i < (FFT_SAMPLES / 2); i++) {
-    vReal[i] = constrain(vReal[i], 0, 65535);
-    vReal[i] = map(vReal[i], 0, 65535, 0, 255);
-
-    uint8_t buck = map(i, 0, ((FFT_SAMPLES / 2) - 1), 0, LED_COUNT);
-    freqBuckets[buck] =
-        (vReal[i] > freqBuckets[buck]) ? (uint8_t)vReal[i] : freqBuckets[buck];
-  }
-
-  for (int i = 0; i < LED_COUNT; i++) {
-    leds[i].setHSV(startHue, 255, (freqBuckets[i] > 64) ? freqBuckets[i] : 0);
-    freqBuckets[i] = 0;
-  }
+  //  for (int i = 0; i < FFT_SAMPLES; i++) {
+  //    // newtime = micros() - oldtime;
+  //    // oldtime = newtime;
+  //
+  //    vReal[i] = analogRead(FFT_INPUT_PIN);
+  //    vImag[i] = 0;
+  //
+  //    while (micros() < sampleDelay())
+  //      ;
+  //  }
+  //
+  //  // FFT
+  //  FFT.Windowing(vReal, FFT_SAMPLES, FFT_WIN_TYP_HAMMING, FFT_FORWARD);
+  //  FFT.Compute(vReal, vImag, FFT_SAMPLES, FFT_FORWARD);
+  //  FFT.ComplexToMagnitude(vReal, vImag, FFT_SAMPLES);
+  //
+  //  for (int i = 2; i < (FFT_SAMPLES / 2); i++) {
+  //    vReal[i] = constrain(vReal[i], 0, 65535);
+  //    vReal[i] = map(vReal[i], 0, 65535, 0, 255);
+  //
+  //    uint8_t buck = map(i, 0, ((FFT_SAMPLES / 2) - 1), 0, LED_COUNT);
+  //    freqBuckets[buck] =
+  //        (vReal[i] > freqBuckets[buck]) ? (uint8_t)vReal[i] :
+  //        freqBuckets[buck];
+  //  }
+  //
+  //  for (int i = 0; i < LED_COUNT; i++) {
+  //    leds[i].setHSV(startHue, 255, (freqBuckets[i] > 64) ? freqBuckets[i] :
+  //    0); freqBuckets[i] = 0;
+  //  }
 }
 
 /**
