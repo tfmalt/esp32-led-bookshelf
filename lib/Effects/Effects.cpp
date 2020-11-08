@@ -848,37 +848,6 @@ void Effects::effectFrequencies() {
   CRGBSet ledset(leds, LED_COUNT);
 
   ledset(0, LED_COUNT) = CRGB::Black;
-
-  //  for (int i = 0; i < FFT_SAMPLES; i++) {
-  //    // newtime = micros() - oldtime;
-  //    // oldtime = newtime;
-  //
-  //    vReal[i] = analogRead(FFT_INPUT_PIN);
-  //    vImag[i] = 0;
-  //
-  //    while (micros() < sampleDelay())
-  //      ;
-  //  }
-  //
-  //  // FFT
-  //  FFT.Windowing(vReal, FFT_SAMPLES, FFT_WIN_TYP_HAMMING, FFT_FORWARD);
-  //  FFT.Compute(vReal, vImag, FFT_SAMPLES, FFT_FORWARD);
-  //  FFT.ComplexToMagnitude(vReal, vImag, FFT_SAMPLES);
-  //
-  //  for (int i = 2; i < (FFT_SAMPLES / 2); i++) {
-  //    vReal[i] = constrain(vReal[i], 0, 65535);
-  //    vReal[i] = map(vReal[i], 0, 65535, 0, 255);
-  //
-  //    uint8_t buck = map(i, 0, ((FFT_SAMPLES / 2) - 1), 0, LED_COUNT);
-  //    freqBuckets[buck] =
-  //        (vReal[i] > freqBuckets[buck]) ? (uint8_t)vReal[i] :
-  //        freqBuckets[buck];
-  //  }
-  //
-  //  for (int i = 0; i < LED_COUNT; i++) {
-  //    leds[i].setHSV(startHue, 255, (freqBuckets[i] > 64) ? freqBuckets[i] :
-  //    0); freqBuckets[i] = 0;
-  //  }
 }
 
 /**

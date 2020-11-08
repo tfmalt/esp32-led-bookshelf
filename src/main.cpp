@@ -25,20 +25,28 @@
 #ifdef IS_ESP32
 #include <ArduinoOTA.h>
 #include <MQTTController.h>
-#include <WiFiController.h>
+// #include <WiFiController.h>
+#endif  // IS_ESP32
+
+#ifdef IS_TEENSY
+#include <SerialMQTT.h>
 #endif
 
 FASTLED_USING_NAMESPACE
 
 // global objects
 CRGBArray<LED_COUNT> leds;
+
 LedshelfConfig config;
-LightStateController lightState;
 Effects effects;
+LightStateController lightState;
 
 #ifdef IS_ESP32
-WiFiController wifiCtrl(config);
-MQTTController mqttCtrl(VERSION, config, wifiCtrl, lightState, effects);
+MQTTController mqttCtrl(VERSION, config, lightState, effects);
+#endif
+
+#ifdef IS_TEENSY
+SerialMQTT serialCtrl;
 #endif
 
 uint16_t commandFrames = FPS;
@@ -54,7 +62,7 @@ uint8_t updateProgress = 0;
 void setupFastLED() {
 #ifdef DEBUG
   Serial.println("Setting up LED");
-  Serial.printf("  - number of leds: %i, max mA: %i\n", LED_COUNT, LED_mA);
+  Serial.printf("  - x number of leds: %i, max mA: %i\n", LED_COUNT, LED_mA);
 #endif
 
 #ifdef LED_CLOCK
@@ -102,7 +110,7 @@ void setupFastLED() {
 uint8_t OTA_HUE = 64;
 void setupArduinoOTA() {
   ArduinoOTA.setPort(3232);
-  ArduinoOTA.setPassword(config.mqtt_password);
+  ArduinoOTA.setPassword(config.mqtt_password.c_str());
   ArduinoOTA
       .onStart([]() {
         // U_FLASH or U_SPIFFS
@@ -178,8 +186,6 @@ void setup() {
   config.setup();
 
 #ifdef IS_ESP32
-  wifiCtrl.setup();
-  wifiCtrl.connect();
   mqttCtrl.setup();
 
   setupArduinoOTA();

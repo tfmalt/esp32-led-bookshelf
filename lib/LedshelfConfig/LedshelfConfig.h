@@ -6,144 +6,63 @@
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
-#ifdef IS_ESP32
-#include <SPIFFS.h>
-#endif
+#include <Credentials.h>
+
+#include <string>
 
 class LedshelfConfig {
  public:
-  // char ca_root[1680];
-  char wifi_ssid[64];
-  char wifi_psk[64];
-  char wifi_hostname[16];
-  char mqtt_server[32];
-  uint16_t mqtt_port;
-  char mqtt_username[32];
-  char mqtt_password[64];
-  bool mqtt_ssl;
-  char mqtt_client[32];
-  char mqtt_command_topic[16];
-  char mqtt_state_topic[16];
-  char mqtt_status_topic[16];
-  char mqtt_query_topic[16];
-  char mqtt_information_topic[16];
-  char mqtt_update_topic[16];
-  uint16_t fastled_LED_COUNT;
+  std::string wifi_ssid = WIFI_SSID;
+  std::string wifi_psk = WIFI_PSK;
+  std::string wifi_hostname = WIFI_HOSTNAME;
+
+  std::string mqtt_server = MQTT_SERVER;
+  uint16_t mqtt_port = MQTT_PORT;
+
+  std::string mqtt_username = MQTT_USER;
+  std::string mqtt_password = MQTT_PASS;
+
+  std::string mqtt_client = MQTT_CLIENT;
+  std::string mqtt_command_topic = MQTT_TOPIC_COMMAND;
+  std::string mqtt_state_topic = MQTT_TOPIC_STATE;
+  std::string mqtt_status_topic = MQTT_TOPIC_STATUS;
+  std::string mqtt_query_topic = MQTT_TOPIC_QUERY;
+  std::string mqtt_information_topic = MQTT_TOPIC_INFORMATION;
+  std::string mqtt_update_topic = MQTT_TOPIC_UPDATE;
 
   LedshelfConfig(){};
 
-  void setup() {
-#ifdef IS_ESP32
-    if (!SPIFFS.begin()) {
-      ESP.restart();
-      return;
-    }
-
-    parseConfigFile();
-#endif
-  }
+  void setup() {}
 
   void stateTopic(char *topic) {
-    strcpy(topic, "/");
-    strcat(topic, mqtt_username);
-    strcat(topic, mqtt_state_topic);
+    std::string newtopic = "/" + mqtt_username + mqtt_state_topic;
+    strcpy(topic, newtopic.c_str());
   }
 
   void commandTopic(char *topic) {
-    strcpy(topic, "/");
-    strcat(topic, mqtt_username);
-    strcat(topic, mqtt_command_topic);
+    std::string newtopic = "/" + mqtt_username + mqtt_command_topic;
+    strcpy(topic, newtopic.c_str());
   }
 
   void statusTopic(char *topic) {
-    strcpy(topic, "/");
-    strcat(topic, mqtt_username);
-    strcat(topic, mqtt_status_topic);
+    std::string newtopic = "/" + mqtt_username + mqtt_status_topic;
+    strcpy(topic, newtopic.c_str());
   }
 
   void queryTopic(char *topic) {
-    strcpy(topic, "/");
-    strcat(topic, mqtt_username);
-    strcat(topic, mqtt_query_topic);
+    std::string newtopic = "/" + mqtt_username + mqtt_query_topic;
+    strcpy(topic, newtopic.c_str());
   }
 
   void informationTopic(char *topic) {
-    strcpy(topic, "/");
-    strcat(topic, mqtt_username);
-    strcat(topic, mqtt_information_topic);
+    std::string newtopic = "/" + mqtt_username + mqtt_information_topic;
+    strcpy(topic, newtopic.c_str());
   }
 
   void updateTopic(char *topic) {
-    strcpy(topic, "/");
-    strcat(topic, mqtt_username);
-    strcat(topic, mqtt_update_topic);
+    std::string newtopic = "/" + mqtt_username + mqtt_update_topic;
+    strcpy(topic, newtopic.c_str());
   }
-
- private:
-#ifdef IS_ESP32
-  void parseConfigFile() {
-#ifdef DEBUG
-    Serial.printf("  - Parsing config file: %s ... ", CONFIG_FILE);
-#endif  // DEBUG
-
-    File file = SPIFFS.open(CONFIG_FILE, "r");
-
-    if (!file) return;
-
-    StaticJsonDocument<680> config;
-    auto error = deserializeJson(config, file);
-
-    file.close();
-
-    if (error) return;
-
-    strlcpy(wifi_ssid, config["wifi"]["ssid"] | "", sizeof(wifi_ssid));
-    strlcpy(wifi_psk, config["wifi"]["psk"] | "", sizeof(wifi_psk));
-    strlcpy(wifi_hostname, config["wifi"]["hostname"] | "ledshelf",
-            sizeof(wifi_hostname));
-    strlcpy(mqtt_server, config["mqtt"]["server"] | "", sizeof(mqtt_server));
-    mqtt_port = config["mqtt"]["port"] | 1883;
-    mqtt_ssl = config["mqtt"]["ssl"] | false;
-    strlcpy(mqtt_username, config["mqtt"]["username"] | "",
-            sizeof(mqtt_username));
-    strlcpy(mqtt_password, config["mqtt"]["password"] | "",
-            sizeof(mqtt_password));
-    strlcpy(mqtt_client, config["mqtt"]["client"] | "", sizeof(mqtt_client));
-    strlcpy(mqtt_command_topic, config["mqtt"]["topics"]["command"] | "",
-            sizeof(mqtt_command_topic));
-    strlcpy(mqtt_state_topic, config["mqtt"]["topics"]["state"] | "",
-            sizeof(mqtt_state_topic));
-    strlcpy(mqtt_status_topic, config["mqtt"]["topics"]["status"] | "",
-            sizeof(mqtt_status_topic));
-    strlcpy(mqtt_query_topic, config["mqtt"]["topics"]["query"] | "",
-            sizeof(mqtt_query_topic));
-    strlcpy(mqtt_information_topic,
-            config["mqtt"]["topics"]["information"] | "",
-            sizeof(mqtt_information_topic));
-    strlcpy(mqtt_update_topic, config["mqtt"]["topics"]["update"] | "",
-            sizeof(mqtt_update_topic));
-
-#ifdef DEBUG
-    Serial.println("Done");
-#endif  // DEBUG
-  }
-#endif  // IS_ESP32
-
-  /**
-   * Reads the TLS CA Root Certificate from file.
-   */
-  // void readCAFile() {
-  //   File file = SPIFFS.open("/ca.pem", "r");
-  //
-  //     if (!file) return;
-  //
-  //     strcpy(ca_root, "");
-  //     while (file.available()) {
-  //       strcat(ca_root, file.readString().c_str());
-  //     }
-  //
-  //     file.close();
-  //   }
 };
 
 #endif  // LEDSHELFCONFIG_H

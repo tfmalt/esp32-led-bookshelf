@@ -18,9 +18,10 @@ class MQTTController {
   const char *version;
   LedshelfConfig &config;
   PubSubClient client;
-  WiFiController &wifiCtrl;
   LightStateController &lightState;
   Effects &effects;
+
+  WiFiController wifiCtrl;
 
   char statusTopic[32];
   char commandTopic[32];
@@ -30,9 +31,9 @@ class MQTTController {
   char queryTopic[32];
 
   // MQTTController();
-  MQTTController(const char *v_, LedshelfConfig &c_, WiFiController &w_,
-                 LightStateController &l_, Effects &e_)
-      : version(v_), config(c_), wifiCtrl(w_), lightState(l_), effects(e_){};
+  MQTTController(const char *v_, LedshelfConfig &c_, LightStateController &l_,
+                 Effects &e_)
+      : version(v_), config(c_), lightState(l_), effects(e_), wifiCtrl(c_){};
 
   void setup();
   void checkConnection();

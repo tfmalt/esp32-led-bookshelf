@@ -1,29 +1,16 @@
 /**
  * Class responsible for keeping track of the state of the light.
  *
- * Copyright 2018 Thomas Malt <thomas@malt.no>
+ * Copyright 2018-2020 Thomas Malt <thomas@malt.no>
  */
 #include "LightStateController.h"
 
 #include <ArduinoJson.h>
+
 #ifdef IS_ESP32
 #include <FS.h>
 #include <SPIFFS.h>
 #endif
-
-LightStateController::LightStateController() {
-  Color defaultColor = {0};
-
-  LightStatus defaultStatus = {false};
-  defaultStatus.status = 255;
-
-  defaultState.color = defaultColor;
-  defaultState.effect = "colorloop";
-  defaultState.brightness = 255;
-  defaultState.transition = 1;
-  defaultState.state = false;
-  defaultState.status = defaultStatus;
-}
 
 LightStateController &LightStateController::setCurrentState(
     const char *stateString) {
@@ -76,22 +63,8 @@ uint8_t LightStateController::initialize() {
 }
 
 LightState &LightStateController::parseNewState(byte *payload) {
-  // try {
   LightState newState = getLightStateFromPayload(payload);
   currentState = newState;
-  // } catch (LightState errState) {
-  //   String error = "Unknown";
-  //   if (errState.status.status == LIGHT_MQTT_JSON_FAILED) {
-  //     error = "Parsing of json failed.";
-  //   } else if (errState.status.status == LIGHT_MQTT_JSON_NO_STATE) {
-  //     error = "Did not get correct state parameter in Json.";
-  //   }
-  //
-  // #ifdef DEBUG
-  //     Serial.printf("ERROR: parsing of new state threw error: %s\n",
-  //                   error.c_str());
-  // #endif
-  //   }
 
 #ifdef DEBUG
   Serial.println("  - Saving current state to file.");
@@ -126,30 +99,6 @@ void LightStateController::printStateDebug(LightState &state) {
 #endif
 }
 
-/**
- * Takes a JsonObject reference and returns a color struct.
- */
-// Color LightStateController::getColorFromJsonObject(JsonObject &obj)
-// {
-//     Color color = {0};
-//
-//     //if (!obj.containsKey("color"))
-//     //    return color;
-//     //
-//     //JsonObject cJson = root["color"].as<JsonObject>();
-//
-//     // if (!cJson.success())
-//     //     return color;
-//
-//     color.r = (uint8_t)obj["r"];
-//     color.g = (uint8_t)obj["g"];
-//     color.b = (uint8_t)obj["b"];
-//     color.h = (float)obj["h"];
-//     color.s = (float)obj["s"];
-//
-//     return color;
-// }
-
 LightState LightStateController::getLightStateFromPayload(byte *payload) {
   StaticJsonDocument<256> data;
   auto error = deserializeJson(data, payload);
@@ -162,7 +111,7 @@ LightState LightStateController::getLightStateFromPayload(byte *payload) {
     newState.status.status = LIGHT_MQTT_JSON_FAILED;
     newState.status.success = false;
     // throw newState;
-    Serial.printf("ERROR: Got error reading state from payload: %i\n", error);
+    Serial.printf("ERROR: Got error reading state from payload.\n");
   }
 
   if (!data.containsKey("state")) {
@@ -221,6 +170,9 @@ LightState LightStateController::getLightStateFromPayload(byte *payload) {
   return newState;
 }
 
+/**
+ * Serializes the current state into the output buffer
+ */
 void LightStateController::serializeCurrentState(char *output, int length) {
   LightState state = getCurrentState();
   StaticJsonDocument<256> doc;
@@ -240,26 +192,9 @@ void LightStateController::serializeCurrentState(char *output, int length) {
   serializeJson(doc, output, length);
 }
 
-// JsonObject &LightStateController::currentStateAsJson(JsonObject &object,
-// JsonObject &color)
-// {
-//     LightState state = getCurrentState();
-//
-//     color["r"] = state.color.r;
-//     color["g"] = state.color.g;
-//     color["b"] = state.color.b;
-//     color["h"] = state.color.h;
-//     color["s"] = state.color.s;
-//
-//     object["state"] = (state.state) ? "ON" : "OFF";
-//     object["brightness"] = state.brightness;
-//     object["color_temp"] = state.color_temp;
-//     object["color"] = color;
-//     object["effect"] = state.effect;
-//
-//     return object;
-// }
-
+/**
+ * Saves the current state to spiffs or eeprom
+ */
 uint8_t LightStateController::saveCurrentState() {
 #ifdef IS_ESP32
   char json[256];
@@ -274,4 +209,7 @@ uint8_t LightStateController::saveCurrentState() {
   return LIGHT_STATEFILE_WROTE_SUCCESS;
 }
 
+/**
+ * Returns current state
+ */
 LightState &LightStateController::getCurrentState() { return currentState; }

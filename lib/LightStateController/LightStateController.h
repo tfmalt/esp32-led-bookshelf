@@ -19,6 +19,7 @@ typedef struct Color {
   uint8_t g;
   uint8_t b;
   float x;
+  ;
   float y;
   float h;
   float s;
@@ -49,12 +50,26 @@ typedef struct LightState {
 
 class LightStateController {
  public:
-  LightStateController();
+  LightStateController() {
+    Color defaultColor = {0};
+
+    LightStatus defaultStatus = {false};
+    defaultStatus.status = 255;
+
+    defaultState.color = defaultColor;
+    defaultState.effect = "colorloop";
+    defaultState.brightness = 255;
+    defaultState.transition = 1;
+    defaultState.state = false;
+    defaultState.status = defaultStatus;
+  };
+
   uint8_t initialize();
   LightStateController &setCurrentState(const char *stateString);
   LightState &parseNewState(byte *payload);
   LightState &getCurrentState();
   void serializeCurrentState(char *output, int length);
+  void handleNewState(byte *payload);
 
  private:
   std::map<String, LightState> lightStates;

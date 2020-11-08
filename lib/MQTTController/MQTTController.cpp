@@ -9,22 +9,14 @@
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", 3600, 60000);
 
-// MQTTController::MQTTController(const char *v_, LedshelfConfig &c_,
-// WiFiController &w_, LightStateController &l_, Effects &e_)
-// {
-//     Serial.println("paramter constructor called");
-// }
-
-// MQTTController::MQTTController()
-// {
-//     Serial.println("Default constructor called");
-// }
-
 void MQTTController::setup() {
 #ifdef DEBUG
-  Serial.printf("Setting up MQTT Client: %s %i\n", config.mqtt_server,
+  Serial.printf("Setting up MQTT Client: %s %i\n", config.mqtt_server.c_str(),
                 config.mqtt_port);
 #endif
+
+  wifiCtrl.setup();
+  wifiCtrl.connect();
 
   config.statusTopic(statusTopic);
   config.commandTopic(commandTopic);
@@ -44,7 +36,7 @@ void MQTTController::setup() {
 #endif
 
   client.setClient(wifi);
-  client.setServer(config.mqtt_server, config.mqtt_port);
+  client.setServer(config.mqtt_server.c_str(), config.mqtt_port);
   client.setCallback(
       [this](char *p_topic, byte *p_message, unsigned int p_length) {
         callback(p_topic, p_message, p_length);
@@ -62,7 +54,8 @@ void MQTTController::checkConnection() {
   }
   if (!client.connected()) {
 #ifdef DEBUG
-    Serial.printf("MQTT broker not connected: %s\n", config.mqtt_server);
+    Serial.printf("MQTT broker not connected: %s\n",
+                  config.mqtt_server.c_str());
 #endif
     connect();
   }
@@ -245,10 +238,10 @@ void MQTTController::handleUpdate() {
 
 void MQTTController::connect() {
   IPAddress mqttip;
-  WiFi.hostByName(config.mqtt_server, mqttip);
+  WiFi.hostByName(config.mqtt_server.c_str(), mqttip);
 
 #ifdef DEBUG
-  Serial.printf("  - %s = ", config.mqtt_server);
+  Serial.printf("  - %s = ", config.mqtt_server.c_str());
   Serial.println(mqttip);
 #endif
 
@@ -256,12 +249,12 @@ void MQTTController::connect() {
 #ifdef DEBUG
     Serial.printf(
         "Attempting MQTT connection to \"%s\" \"%i\" as \"%s\":\"%s\" ...",
-        config.mqtt_server, config.mqtt_port, config.mqtt_username,
-        config.mqtt_password);
+        config.mqtt_server.c_str(), config.mqtt_port,
+        config.mqtt_username.c_str(), config.mqtt_password.c_str());
 #endif
 
-    if (client.connect(config.mqtt_client, config.mqtt_username,
-                       config.mqtt_password, statusTopic, 0, true,
+    if (client.connect(config.mqtt_client.c_str(), config.mqtt_username.c_str(),
+                       config.mqtt_password.c_str(), statusTopic, 0, true,
                        "Disconnected")) {
 #ifdef DEBUG
       Serial.println(" connected");

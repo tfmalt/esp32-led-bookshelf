@@ -2,7 +2,6 @@
 #define Effects_h
 
 #include <Arduino.h>
-// #include <ArduinoOTA.h>
 #include <FastLED.h>
 #include <LightStateController.h>
 
@@ -75,6 +74,7 @@ class Effects {
   Command currentCommandType;
   Effect currentEffectType;
   ulong commandStart = 0;
+
   Effects() {
     this->currentCommand = &Effects::cmdEmpty;
     this->currentEffect = &Effects::cmdEmpty;

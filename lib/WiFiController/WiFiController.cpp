@@ -14,12 +14,12 @@ void WiFiController::setup() {
  */
 void WiFiController::connect() {
 #ifdef DEBUG
-  Serial.printf("  - Connecting to: %s:%s\n", config.wifi_ssid,
-                config.wifi_psk);
+  Serial.printf("  - Connecting to: %s:%s\n", config.wifi_ssid.c_str(),
+                config.wifi_psk.c_str());
 #endif
 
-  WiFi.begin(config.wifi_ssid, config.wifi_psk);
-  WiFi.setHostname(config.wifi_hostname);
+  WiFi.begin(config.wifi_ssid.c_str(), config.wifi_psk.c_str());
+  WiFi.setHostname(config.wifi_hostname.c_str());
 
   // Wait here until we are connected.
   while (WiFi.status() != WL_CONNECTED) {
@@ -41,7 +41,7 @@ WiFiClient &WiFiController::getWiFiClient() { return wifiClient; };
 void WiFiController::testOutput() {
 #ifdef DEBUG
   Serial.printf("    - Testing output.\n");
-  Serial.println(config.wifi_ssid);
+  Serial.println(config.wifi_ssid.c_str());
 #endif
 }
 
@@ -93,7 +93,7 @@ void WiFiController::handleEvent(WiFiEvent_t event) {
     case SYSTEM_EVENT_STA_CONNECTED:
 #ifdef DEBUG
       Serial.printf("  - Connected to access point [%s][%i]\n",
-                    config.wifi_ssid, event);
+                    config.wifi_ssid.c_str(), event);
 #endif
       break;
     // SYSTEM_EVENT_STA_DISCONNECTED         < ESP32 station disconnected from
