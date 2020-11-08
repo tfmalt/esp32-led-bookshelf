@@ -19,18 +19,21 @@
 #include <Arduino.h>
 #include <Effects.h>
 #include <FastLED.h>
-#include <LedshelfConfig.h>
 #include <LightStateController.h>
 
 #ifdef IS_ESP32
 #include <ArduinoOTA.h>
-#include <MQTTController.h>
-// #include <WiFiController.h>
 #endif  // IS_ESP32
 
-#ifdef IS_TEENSY
-#include <SerialMQTT.h>
-#endif
+#include <EventDispatcher.hpp>
+#include <LedshelfConfig.hpp>
+
+// #include <MQTTController.hpp>
+// // #include <WiFiController.h>
+//
+// #ifdef IS_TEENSY
+// #include <SerialMQTT.hpp>
+// #endif
 
 FASTLED_USING_NAMESPACE
 
@@ -41,13 +44,15 @@ LedshelfConfig config;
 Effects effects;
 LightStateController lightState;
 
-#ifdef IS_ESP32
-MQTTController mqttCtrl(VERSION, config, lightState, effects);
-#endif
+EventDispatcher hub;
 
-#ifdef IS_TEENSY
-SerialMQTT serialCtrl;
-#endif
+// #ifdef IS_ESP32
+// MQTTController mqttCtrl(VERSION, config, lightState, effects);
+// #endif
+//
+// #ifdef IS_TEENSY
+// SerialMQTT serialCtrl;
+// #endif
 
 uint16_t commandFrames = FPS;
 uint16_t commandFrameCount = 0;
@@ -118,9 +123,9 @@ void setupArduinoOTA() {
             (ArduinoOTA.getCommand() == U_FLASH) ? "sketch" : "filesystem";
         // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS
         // using SPIFFS.end()
-        mqttCtrl.publishInformation((String("Start updating " + type)).c_str());
+        hub.publishInformation((String("Start updating " + type)).c_str());
       })
-      .onEnd([]() { mqttCtrl.publishInformation("Finished"); })
+      .onEnd([]() { hub.publishInformation("Finished"); })
       .onProgress([](uint32_t progress, uint32_t total) {
         uint8_t percent = progress / (total / 100);
         uint8_t range = map(percent, 0, 100, 0, 15);
@@ -168,7 +173,7 @@ void setupArduinoOTA() {
         }
         String message =
             "Firmware Update Error [" + String(error) + "]: " + errmsg;
-        mqttCtrl.publishInformation(message.c_str());
+        hub.publishInformation(message.c_str());
       });
 }
 #endif  // IS_ESP32
@@ -184,10 +189,9 @@ void setup() {
 #endif
 
   config.setup();
+  hub.setup();
 
 #ifdef IS_ESP32
-  mqttCtrl.setup();
-
   setupArduinoOTA();
 #endif  // IS_ESP32
 
@@ -204,15 +208,13 @@ unsigned long timetowait = 1000 / FPS;
 unsigned long previoustime = 0;
 
 void loop() {
-#ifdef IS_ESP32
-  mqttCtrl.checkConnection();
-#endif
+  hub.loop();
 
   if (effects.currentCommandType == Effects::Command::FirmwareUpdate) {
 #ifdef IS_ESP32
     ArduinoOTA.handle();
     if (millis() > (effects.commandStart + 30000)) {
-      mqttCtrl.publishInformation("No update started for 180s. Rebooting.");
+      hub.publishInformation("No update started for 180s. Rebooting.");
       delay(1000);
       ESP.restart();
     }
@@ -227,17 +229,6 @@ void loop() {
   } else {
     effects.runCurrentCommand();
     effects.runCurrentEffect();
-#ifdef IS_ESP32
-    EVERY_N_SECONDS(60) { mqttCtrl.publishStatus(); }
-
-#ifdef DEBUG
-    EVERY_N_SECONDS(60) {
-#else
-    EVERY_N_SECONDS(300) {
-#endif  // DEBUG
-      mqttCtrl.publishInformationData();
-    }
-#endif  // IS_ESP32
   }
 #ifdef DEBUG
   EVERY_N_SECONDS(10) {

@@ -1,7 +1,6 @@
 #ifdef IS_ESP32
-#include "WiFiController.h"
+#include "WiFiController.hpp"
 // #include <WiFiClientSecure.h>
-#include <LedshelfConfig.h>
 #include <WiFi.h>
 
 void WiFiController::setup() {
