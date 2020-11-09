@@ -49,7 +49,7 @@ MQTTController &MQTTController::setup() {
                             unsigned int p_length) {
     std::string topic = p_topic;
     std::string message(reinterpret_cast<const char *>(p_message), p_length);
-    // callback_f(p_topic, p_message, p_length);
+
     _onMessage(topic, message);
   });
 
@@ -62,38 +62,36 @@ MQTTController &MQTTController::setup() {
 MQTTController &MQTTController::onMessage(
     std::function<void(std::string, std::string)> callback) {
   this->_onMessage = callback;
+  return *this;
 }
 
 MQTTController &MQTTController::onReady(std::function<void()> callback) {
   this->_onReady = callback;
+  return *this;
 }
 
-MQTTController &MQTTController::onDisconnect(std::function<void()> callback) {
+MQTTController &MQTTController::onDisconnect(
+    std::function<void(std::string msg)> callback) {
   this->_onDisconnect = callback;
+  return *this;
 }
 
 MQTTController &MQTTController::onError(
     std::function<void(std::string error)> callback) {
   this->_onError = callback;
+  return *this;
 }
 
 void MQTTController::checkConnection() {
   if (WiFi.status() != WL_CONNECTED) {
-#ifdef DEBUG
-    Serial.println("Restarting because WiFI not connected.");
-#endif
-
     this->_onError("Restarting because WiFi not connected.");
     delay(1000);
     ESP.restart();
     return;
   }
   if (!client.connected()) {
-#ifdef DEBUG
-    Serial.printf("MQTT broker not connected: %s\n",
-                  config.mqtt_server.c_str());
-#endif
-    this->_onDisconnect();
+    std::string msg = "MQTT broker not connected: " + config.mqtt_server;
+    this->_onDisconnect(msg);
     connect();
   }
 
@@ -116,10 +114,7 @@ void MQTTController::publishState() {
 }
 
 void MQTTController::publishInformation(const char *message) {
-  Serial.printf("GETTING READY: %s %s\n", informationTopic, message);
-
   client.publish(informationTopic, message, false);
-  Serial.println("DONE");
 }
 
 /**
@@ -128,9 +123,6 @@ void MQTTController::publishInformation(const char *message) {
  */
 void MQTTController::publishInformationData() {
   char *msg;
-
-  Serial.println("PUBLISHINFORMATION DATA");
-
   asprintf(&msg,
            "{\"time\": \"%s\", \"hostname\": \"%s\", \"version\": \"%s\", "
            "\"uptime\": %lu, \"memory\": %d }",
@@ -139,10 +131,6 @@ void MQTTController::publishInformationData() {
            millis(), xPortGetFreeHeapSize());
 
   const char *message = msg;
-
-  Serial.println(message);
-  Serial.println(strlen(message));
-
   publishInformation(message);
 }
 
@@ -329,7 +317,6 @@ void MQTTController::connect() {
       client.subscribe(queryTopic);
       client.subscribe(updateTopic);
 
-      Serial.println("GOT HERE!");
       publishStatus();
       publishInformationData();
     } else {
@@ -341,7 +328,6 @@ void MQTTController::connect() {
     }
   }
 
-  Serial.println("READY TO PUBLISH STATE");
   this->_onReady();
   publishState();
 }

@@ -5,6 +5,7 @@
 #include <FastLED.h>
 
 #include <LedshelfConfig.hpp>
+#include <map>
 #include <string>
 
 #ifdef IS_ESP32
@@ -14,6 +15,9 @@
 #ifdef IS_TEENSY
 #include <SerialMQTT.hpp>
 #endif
+
+typedef std::map<std::string, std::function<void(std::string, std::string)>>
+    TopicHandlerMap;
 
 class EventDispatcher {
  public:
@@ -55,7 +59,8 @@ class EventDispatcher {
   }
 
  private:
-  LedshelfConfig config;
+  static LedshelfConfig config;
+  static TopicHandlerMap handlers;
 #ifdef IS_ESP32
   MQTTController mqtt;
 #endif
@@ -64,15 +69,33 @@ class EventDispatcher {
 #endif
 
   static void handleMessage(std::string topic, std::string message) {
-    Serial.println("Got data:");
-    Serial.println(topic.c_str());
+    Serial.println("Handle Message:");
+    Serial.printf("  - topic: %s\n", topic.c_str());
     Serial.println(message.c_str());
+
+    handlers[config.state_topic] = handleState;
+
+    auto h = handlers.find(topic);
+    if (h != handlers.end()) {
+      h->second(topic, message);
+    }
   }
 
-  static void handleReady() { Serial.println("GOT MQTT Ready"); }
-  static void handleDisconnect() { Serial.println("MQTT client disconnected"); }
+  static void handleReady() {
+    // got ready handler
+    Serial.println("GOT MQTT Ready");
+  }
+
+  static void handleDisconnect(std::string msg) {
+    Serial.printf("MQTT Disconnect: %s\n", msg.c_str());
+  }
+
   static void handleError(std::string error) {
-    Serial.printf("GOT ERROR: %s\n", error.c_str());
+    Serial.printf("ERROR: %s\n", error.c_str());
+  }
+
+  static void handleState(std::string topic, std::string message) {
+    Serial.printf("Handle State: %s\n", message.c_str());
   }
 };
 

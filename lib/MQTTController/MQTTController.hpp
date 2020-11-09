@@ -43,7 +43,7 @@ class MQTTController {
 
   MQTTController &setup();
   MQTTController &onReady(std::function<void()> callback);
-  MQTTController &onDisconnect(std::function<void()> callback);
+  MQTTController &onDisconnect(std::function<void(std::string msg)> callback);
   MQTTController &onError(std::function<void(std::string error)> callback);
   MQTTController &onMessage(
       std::function<void(std::string, std::string)> callback);
@@ -56,7 +56,7 @@ class MQTTController {
  private:
   std::function<void(std::string, std::string)> _onMessage;
   std::function<void()> _onReady;
-  std::function<void()> _onDisconnect;
+  std::function<void(std::string)> _onDisconnect;
   std::function<void(std::string)> _onError;
 
   void publishState();

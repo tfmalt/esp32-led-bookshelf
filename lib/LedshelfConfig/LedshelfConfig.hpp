@@ -30,39 +30,43 @@ class LedshelfConfig {
   std::string mqtt_information_topic = MQTT_TOPIC_INFORMATION;
   std::string mqtt_update_topic = MQTT_TOPIC_UPDATE;
 
-  LedshelfConfig(){};
+  std::string state_topic;
+  std::string command_topic;
+  std::string status_topic;
+  std::string query_topic;
+  std::string information_topic;
+  std::string update_topic;
+
+  LedshelfConfig() {
+    state_topic = "/" + mqtt_username + mqtt_state_topic;
+    command_topic = "/" + mqtt_username + mqtt_command_topic;
+    status_topic = "/" + mqtt_username + mqtt_status_topic;
+    query_topic = "/" + mqtt_username + mqtt_query_topic;
+    information_topic = "/" + mqtt_username + mqtt_information_topic;
+    update_topic = "/" + mqtt_username + mqtt_update_topic;
+  };
 
   void setup() {}
 
-  void stateTopic(char *topic) {
-    std::string newtopic = "/" + mqtt_username + mqtt_state_topic;
-    strcpy(topic, newtopic.c_str());
-  }
+  std::string &stateTopic() { return state_topic; }
+  void stateTopic(char *topic) { strcpy(topic, state_topic.c_str()); }
 
-  void commandTopic(char *topic) {
-    std::string newtopic = "/" + mqtt_username + mqtt_command_topic;
-    strcpy(topic, newtopic.c_str());
-  }
+  std::string &commandTopic() { return command_topic; }
+  void commandTopic(char *topic) { strcpy(topic, command_topic.c_str()); }
 
-  void statusTopic(char *topic) {
-    std::string newtopic = "/" + mqtt_username + mqtt_status_topic;
-    strcpy(topic, newtopic.c_str());
-  }
+  std::string &statusTopic() { return status_topic; }
+  void statusTopic(char *topic) { strcpy(topic, status_topic.c_str()); }
 
-  void queryTopic(char *topic) {
-    std::string newtopic = "/" + mqtt_username + mqtt_query_topic;
-    strcpy(topic, newtopic.c_str());
-  }
+  std::string &queryTopic() { return query_topic; }
+  void queryTopic(char *topic) { strcpy(topic, query_topic.c_str()); }
 
+  std::string &informationTopic() { return information_topic; }
   void informationTopic(char *topic) {
-    std::string newtopic = "/" + mqtt_username + mqtt_information_topic;
-    strcpy(topic, newtopic.c_str());
+    strcpy(topic, information_topic.c_str());
   }
 
-  void updateTopic(char *topic) {
-    std::string newtopic = "/" + mqtt_username + mqtt_update_topic;
-    strcpy(topic, newtopic.c_str());
-  }
+  std::string &updateTopic() { return update_topic; };
+  void updateTopic(char *topic) { strcpy(topic, update_topic.c_str()); }
 };
 
 #endif  // LEDSHELFCONFIG_H
