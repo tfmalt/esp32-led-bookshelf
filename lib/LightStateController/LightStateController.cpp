@@ -3,7 +3,7 @@
  *
  * Copyright 2018-2020 Thomas Malt <thomas@malt.no>
  */
-#include "LightStateController.h"
+#include "LightStateController.hpp"
 
 #include <ArduinoJson.h>
 
@@ -68,8 +68,8 @@ uint8_t LightStateController::initialize() {
   return 0;
 }
 
-LightState &LightStateController::parseNewState(byte *payload) {
-  LightState newState = getLightStateFromPayload(payload);
+LightState &LightStateController::parseNewState(std::string data) {
+  LightState newState = getLightStateFromPayload(data);
   currentState = newState;
 
 #ifdef DEBUG
@@ -81,31 +81,12 @@ LightState &LightStateController::parseNewState(byte *payload) {
   return currentState;
 }
 
-void LightStateController::printStateDebug(LightState &state) {
-#ifdef DEBUG
-  Serial.println("DEBUG: got new LightState:");
-  Serial.printf("  - has state: %s, value: %s\n",
-                (state.status.hasState ? "true" : "false"),
-                (state.state) ? "On" : "Off");
-  Serial.printf("  - has brightness: %s, value: %i\n",
-                (state.status.hasBrightness ? "true" : "false"),
-                state.brightness);
-  Serial.printf("  - has color_temp: %s, value: %i\n",
-                (state.status.hasColorTemp ? "true" : "false"),
-                state.color_temp);
-  Serial.printf("  - has transition: %s, value: %i\n",
-                (state.status.hasTransition ? "true" : "false"),
-                state.transition);
-  Serial.printf("  - has effect: %s, value: '%s'\n",
-                (state.status.hasEffect ? "true" : "false"),
-                state.effect.c_str());
-  Serial.printf("  - has color: %s, value: [%i,%i,%i,%0.2f,%0.2f]\n",
-                (state.status.hasColor ? "true" : "false"), state.color.r,
-                state.color.g, state.color.b, state.color.h, state.color.s);
-#endif
-}
+// LightState &LightStateController::parseNewState(byte *payload) {
+//   Serial.println("Lightstate got parse new state.");
+//   return currentState;
+// }
 
-LightState LightStateController::getLightStateFromPayload(byte *payload) {
+LightState LightStateController::getLightStateFromPayload(std::string payload) {
   StaticJsonDocument<256> data;
   auto error = deserializeJson(data, payload);
 
@@ -176,6 +157,15 @@ LightState LightStateController::getLightStateFromPayload(byte *payload) {
   return newState;
 }
 
+std::string LightStateController::getCurrentStateAsJSON() {
+  char json[256];
+
+  serializeCurrentState(json, 256);
+
+  std::string output = json;
+  return output;
+}
+
 /**
  * Serializes the current state into the output buffer
  */
@@ -213,6 +203,30 @@ uint8_t LightStateController::saveCurrentState() {
 #endif
 
   return LIGHT_STATEFILE_WROTE_SUCCESS;
+}
+
+void LightStateController::printStateDebug(LightState &state) {
+#ifdef DEBUG
+  Serial.println("DEBUG: got new LightState:");
+  Serial.printf("  - has state: %s, value: %s\n",
+                (state.status.hasState ? "true" : "false"),
+                (state.state) ? "On" : "Off");
+  Serial.printf("  - has brightness: %s, value: %i\n",
+                (state.status.hasBrightness ? "true" : "false"),
+                state.brightness);
+  Serial.printf("  - has color_temp: %s, value: %i\n",
+                (state.status.hasColorTemp ? "true" : "false"),
+                state.color_temp);
+  Serial.printf("  - has transition: %s, value: %i\n",
+                (state.status.hasTransition ? "true" : "false"),
+                state.transition);
+  Serial.printf("  - has effect: %s, value: '%s'\n",
+                (state.status.hasEffect ? "true" : "false"),
+                state.effect.c_str());
+  Serial.printf("  - has color: %s, value: [%i,%i,%i,%0.2f,%0.2f]\n",
+                (state.status.hasColor ? "true" : "false"), state.color.r,
+                state.color.g, state.color.b, state.color.h, state.color.s);
+#endif
 }
 
 /**

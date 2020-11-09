@@ -1,5 +1,5 @@
 
-#include "Effects.h"
+#include "Effects.hpp"
 
 #if defined(FFT_ACTIVE) && defined(IS_TEENSY)
 #include <AudioFFT.h>
@@ -700,10 +700,6 @@ void Effects::effectPride() {
 }
 
 void Effects::effectWalkingRainbow() {
-  EVERY_N_SECONDS(2) {
-    Serial.printf("  - Running Walking Rainbow: %i\n", startHue);
-  }
-
   EVERY_N_MILLIS(1000 / 60) {
     uint8_t inc = 2;  // 256 / LED_COUNT;
     uint8_t hue = startHue;

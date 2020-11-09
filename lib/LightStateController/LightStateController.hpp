@@ -1,6 +1,6 @@
 
-#ifndef LightStateController_h
-#define LightStateController_h
+#ifndef LightStateController_hpp
+#define LightStateController_hpp
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
@@ -19,7 +19,6 @@ typedef struct Color {
   uint8_t g;
   uint8_t b;
   float x;
-  ;
   float y;
   float h;
   float s;
@@ -66,8 +65,9 @@ class LightStateController {
 
   uint8_t initialize();
   LightStateController &setCurrentState(const char *stateString);
-  LightState &parseNewState(byte *payload);
+  LightState &parseNewState(std::string data);
   LightState &getCurrentState();
+  std::string getCurrentStateAsJSON();
   void serializeCurrentState(char *output, int length);
   void handleNewState(byte *payload);
 
@@ -79,7 +79,7 @@ class LightStateController {
 
   const char *stateFile = "/light_state.json";
 
-  LightState getLightStateFromPayload(byte *payload);
+  LightState getLightStateFromPayload(std::string payload);
   void printStateDebug(LightState &state);
   uint8_t saveCurrentState();
 };

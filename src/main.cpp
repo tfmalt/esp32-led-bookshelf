@@ -17,9 +17,10 @@
  */
 
 #include <Arduino.h>
-#include <Effects.h>
 #include <FastLED.h>
-#include <LightStateController.h>
+
+#include <Effects.hpp>
+#include <LightStateController.hpp>
 
 #ifdef IS_ESP32
 #include <ArduinoOTA.h>
@@ -89,7 +90,6 @@ void setupFastLED() {
 
   FastLED.setMaxPowerInVoltsAndMilliamps(5, LED_mA);
 
-  lightState.initialize();
   LightState &currentState = lightState.getCurrentState();
 
 #ifdef DEBUG
@@ -189,7 +189,11 @@ void setup() {
 #endif
 
   config.setup();
+  lightState.initialize();
+
   hub.setup();
+  hub.setEffects(&effects);
+  hub.setLightState(&lightState);
 
 #ifdef IS_ESP32
   setupArduinoOTA();
@@ -232,8 +236,8 @@ void loop() {
   }
 #ifdef DEBUG
   EVERY_N_SECONDS(10) {
-    Serial.print("FPS: ");
-    Serial.println(FastLED.getFPS());
+    Serial.printf("FPS: %i heap: %i, size: %i, cpu: %i\n", FastLED.getFPS(),
+                  ESP.getFreeHeap(), ESP.getHeapSize(), ESP.getCpuFreqMHz());
   }
 #endif
 

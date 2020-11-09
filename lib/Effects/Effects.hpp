@@ -3,7 +3,8 @@
 
 #include <Arduino.h>
 #include <FastLED.h>
-#include <LightStateController.h>
+
+#include <LightStateController.hpp>
 
 class Effects {
  private:
