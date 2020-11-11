@@ -23,7 +23,7 @@
 #include <LightState.hpp>
 
 #ifdef IS_ESP32
-#include <ArduinoOTA.h>
+#include <LedshelfOTA.hpp>
 #endif  // IS_ESP32
 
 #include <EventDispatcher.hpp>
@@ -38,6 +38,8 @@
 
 FASTLED_USING_NAMESPACE
 
+EventDispatcher EventHub;
+
 // global objects
 CRGBArray<LED_COUNT> leds;
 
@@ -45,7 +47,7 @@ LedshelfConfig config;
 Effects::Controller effects;
 LightState::Controller lightState;
 
-EventDispatcher hub;
+// EventDispatcher hub;
 
 // #ifdef IS_ESP32
 // MQTTController mqttCtrl(VERSION, config, lightState, effects);
@@ -76,106 +78,27 @@ void setupFastLED() {
   Serial.printf("[main]   type: SK9822, data: %i, clock: %i.\n", LED_DATA,
                 LED_CLOCK);
 #endif
-  FastLED
-      .addLeds<LED_TYPE, LED_DATA, LED_CLOCK, LED_COLOR_ORDER,
-               DATA_RATE_MHZ(12)>(leds, LED_COUNT)
-      .setCorrection(TypicalSMD5050);
+  FastLED.addLeds<LED_TYPE, LED_DATA, LED_CLOCK, LED_COLOR_ORDER,
+                  DATA_RATE_MHZ(12)>(leds, LED_COUNT);
 #else
 #ifdef DEBUG
   Serial.printf("[main]   type: WS2812B, data: %i\n", LED_DATA);
 #endif
-  FastLED.addLeds<LED_TYPE, LED_DATA, LED_COLOR_ORDER>(leds, LED_COUNT)
-      .setCorrection(TypicalSMD5050);
+  FastLED.addLeds<LED_TYPE, LED_DATA, LED_COLOR_ORDER>(leds, LED_COUNT);
 #endif
 
+  FastLED.setCorrection(TypicalSMD5050);
   FastLED.setMaxPowerInVoltsAndMilliamps(5, LED_mA);
-
-  LightState::LightState &currentState = lightState.getCurrentState();
+  FastLED.setBrightness(0);  // Start at 0 will set state later.
 
 #ifdef DEBUG
-  Serial.printf("[main] state is: '%s', effect: '%s'\n",
-                currentState.state ? "On" : "Off", currentState.effect.c_str());
+  // Serial.printf("[main] state is: '%s', effect: '%s'\n",
+  //               currentState.state ? "On" : "Off",
+  //               currentState.effect.c_str());
   FastLED.countFPS(FPS);
 #endif
-
-  FastLED.setBrightness(currentState.state ? currentState.brightness : 0);
-
-  effects.setup(leds, LED_COUNT, currentState);
-
-  hub.onStateChange(
-      [](LightState::LightState s) { effects.handleStateChange(s); });
 }
 // END OF setupFastLED
-
-// ========================================================================
-// Arduino OTA Setup
-// ========================================================================
-#ifdef IS_ESP32
-uint8_t OTA_HUE = 64;
-void setupArduinoOTA() {
-  ArduinoOTA.setPort(3232);
-  ArduinoOTA.setPassword(config.mqtt_password.c_str());
-  ArduinoOTA
-      .onStart([]() {
-        // U_FLASH or U_SPIFFS
-        String type =
-            (ArduinoOTA.getCommand() == U_FLASH) ? "sketch" : "filesystem";
-        // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS
-        // using SPIFFS.end()
-        hub.publishInformation((String("Start updating " + type)).c_str());
-      })
-      .onEnd([]() { hub.publishInformation("Finished"); })
-      .onProgress([](uint32_t progress, uint32_t total) {
-        uint8_t percent = progress / (total / 100);
-        uint8_t range = map(percent, 0, 100, 0, 15);
-        uint8_t step = 255 / 15;
-        EVERY_N_MILLIS(25) {
-          OTA_HUE += 1;
-
-          for (int i = 0; i <= range; i++) {
-            uint8_t step_hue = OTA_HUE + (i * step);
-            leds[i] = CHSV(step_hue, 255, 255);
-          }
-          // leds(0, range) = CHSV(96, 255, 255);
-          FastLED.show();
-        }
-#ifdef DEBUG
-        EVERY_N_MILLIS(1000) {
-          Serial.printf("  - Progress: %u %u - percent: %u, range: %u\n",
-                        progress, total, percent, range);
-        }
-#endif
-      })
-      .onError([](ota_error_t error) {
-#ifdef DEBUG
-        Serial.printf("Error[%u]: ", error);
-#endif
-        String errmsg;
-        switch (error) {
-          case OTA_AUTH_ERROR:
-            errmsg = "Authentication failed";
-            break;
-          case OTA_BEGIN_ERROR:
-            errmsg = "Begin failed";
-            break;
-          case OTA_CONNECT_ERROR:
-            errmsg = "Connect failed";
-            break;
-          case OTA_RECEIVE_ERROR:
-            errmsg = "Receive failed";
-            break;
-          case OTA_END_ERROR:
-            errmsg = "End failed";
-            break;
-          default:
-            errmsg = "Unknown error";
-        }
-        String message =
-            "Firmware Update Error [" + String(error) + "]: " + errmsg;
-        hub.publishInformation(message.c_str());
-      });
-}
-#endif  // IS_ESP32
 
 /* ======================================================================
  * SETUP
@@ -184,23 +107,37 @@ void setupArduinoOTA() {
 void setup() {
 #ifdef DEBUG
   Serial.begin(115200);
-  Serial.printf("Starting version %s...\n", VERSION);
+  Serial.println();
+  Serial.printf("[main] Starting version %s...\n", VERSION);
 #endif
 
-  config.setup();
   lightState.initialize();
 
-  hub.setup();
-  hub.setEffects(&effects);
-  hub.setLightState(&lightState);
+  EventHub.setup();
+  EventHub.setEffects(&effects);
+  EventHub.setLightState(&lightState);
+  EventHub.onStateChange(
+      [](LightState::LightState s) { effects.handleStateChange(s); });
 
 #ifdef IS_ESP32
-  setupArduinoOTA();
+  LedshelfOTA::setup(leds);
+  // setupArduinoOTA();
+  EventHub.onFirmwareUpdate([]() {
+    LedshelfOTA::start();
+
+    effects.setCurrentEffect(Effects::Effect::NullEffect);
+    effects.setCurrentCommand(Effects::Command::FirmwareUpdate);
+    effects.runCurrentCommand();
+  });
 #endif  // IS_ESP32
 
   delay(2000);
 
   setupFastLED();
+
+  // FastLED.setBrightness(currentState.state ? currentState.brightness : 0);
+  // LightState::LightState &currentState = lightState.getCurrentState();
+  effects.setup(leds, LED_COUNT, lightState.getCurrentState());
 }
 
 /* ======================================================================
@@ -211,13 +148,13 @@ unsigned long timetowait = 1000 / FPS;
 unsigned long previoustime = 0;
 
 void loop() {
-  hub.loop();
+  EventHub.loop();
 
   if (effects.currentCommandType == Effects::Command::FirmwareUpdate) {
 #ifdef IS_ESP32
-    ArduinoOTA.handle();
+    LedshelfOTA::handle();
     if (millis() > (effects.commandStart + 30000)) {
-      hub.publishInformation("No update started for 180s. Rebooting.");
+      EventHub.publishInformation("No update started for 180s. Rebooting.");
       delay(1000);
       ESP.restart();
     }
