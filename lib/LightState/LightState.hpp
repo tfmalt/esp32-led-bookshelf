@@ -6,6 +6,7 @@
 #include <ArduinoJson.h>
 
 #include <map>
+#include <string>
 
 #define LIGHT_STATEFILE_PARSED_SUCCESS 0
 #define LIGHT_STATEFILE_NOT_FOUND 1
@@ -13,6 +14,8 @@
 #define LIGHT_MQTT_JSON_FAILED 3
 #define LIGHT_MQTT_JSON_NO_STATE 4
 #define LIGHT_STATEFILE_WROTE_SUCCESS 5
+
+namespace LightState {
 
 typedef struct Color {
   uint8_t r;
@@ -42,14 +45,14 @@ typedef struct LightState {
   uint16_t color_temp;
   uint16_t transition;
   Color color;
-  String effect;
+  std::string effect;
   bool state;
   LightStatus status;
 } LightState;
 
-class LightStateController {
+class Controller {
  public:
-  LightStateController() {
+  Controller() {
     Color defaultColor = {0};
 
     LightStatus defaultStatus = {false};
@@ -64,7 +67,7 @@ class LightStateController {
   };
 
   uint8_t initialize();
-  LightStateController &setCurrentState(const char *stateString);
+  // LightState::Controller &setCurrentState(const char *stateString);
   LightState &parseNewState(std::string data);
   LightState &getCurrentState();
   std::string getCurrentStateAsJSON();
@@ -83,5 +86,5 @@ class LightStateController {
   void printStateDebug(LightState &state);
   uint8_t saveCurrentState();
 };
-
+}  // namespace LightState
 #endif  // LightStateController_h

@@ -3,7 +3,7 @@
  *
  * Copyright 2018-2020 Thomas Malt <thomas@malt.no>
  */
-#include "LightStateController.hpp"
+#include "LightState.hpp"
 
 #include <ArduinoJson.h>
 
@@ -12,17 +12,19 @@
 #include <SPIFFS.h>
 #endif
 
-LightStateController &LightStateController::setCurrentState(
-    const char *stateString) {
-#ifdef DEBUG
-  Serial.println("DEBUG: LightStateController up and running.");
-  Serial.printf("  - %s\n", stateFile);
-  Serial.printf("  - %i\n", currentState.color_temp);
-#endif
-  return *this;
-}
+using namespace LightState;
 
-uint8_t LightStateController::initialize() {
+// LightState::Controller &LightState::Controller::setCurrentState(
+//     const char *stateString) {
+// #ifdef DEBUG
+//   Serial.println("DEBUG: LightStateController up and running.");
+//   Serial.printf("  - %s\n", stateFile);
+//   Serial.printf("  - %i\n", currentState.color_temp);
+// #endif
+//   return *this;
+// }
+
+uint8_t LightState::Controller::initialize() {
   currentState = defaultState;
 #ifdef IS_ESP32
   if (!SPIFFS.begin()) {
@@ -54,7 +56,7 @@ uint8_t LightStateController::initialize() {
   currentState.state = (state["state"] == "ON") ? true : false;
 
   // if (root.containsKey("effect"))
-  currentState.effect = state["effect"].as<String>();
+  currentState.effect = state["effect"].as<std::string>();
   currentState.brightness = (uint8_t)state["brightness"];
   currentState.color_temp = (uint16_t)state["color_temp"];
   currentState.color.r = (uint8_t)state["color"]["r"];
@@ -68,7 +70,8 @@ uint8_t LightStateController::initialize() {
   return 0;
 }
 
-LightState &LightStateController::parseNewState(std::string data) {
+LightState::LightState &LightState::Controller::parseNewState(
+    std::string data) {
   LightState newState = getLightStateFromPayload(data);
   currentState = newState;
 
@@ -86,7 +89,8 @@ LightState &LightStateController::parseNewState(std::string data) {
 //   return currentState;
 // }
 
-LightState LightStateController::getLightStateFromPayload(std::string payload) {
+LightState::LightState LightState::Controller::getLightStateFromPayload(
+    std::string payload) {
   StaticJsonDocument<256> data;
   auto error = deserializeJson(data, payload);
 
@@ -133,7 +137,7 @@ LightState LightStateController::getLightStateFromPayload(std::string payload) {
 
   if (data.containsKey("effect")) {
     newState.status.hasEffect = true;
-    newState.effect = data["effect"].as<String>();
+    newState.effect = data["effect"].as<std::string>();
 
     if (newState.effect == "none") {
       newState.effect = "";
@@ -157,7 +161,7 @@ LightState LightStateController::getLightStateFromPayload(std::string payload) {
   return newState;
 }
 
-std::string LightStateController::getCurrentStateAsJSON() {
+std::string LightState::Controller::getCurrentStateAsJSON() {
   char json[256];
 
   serializeCurrentState(json, 256);
@@ -169,7 +173,7 @@ std::string LightStateController::getCurrentStateAsJSON() {
 /**
  * Serializes the current state into the output buffer
  */
-void LightStateController::serializeCurrentState(char *output, int length) {
+void LightState::Controller::serializeCurrentState(char *output, int length) {
   LightState state = getCurrentState();
   StaticJsonDocument<256> doc;
 
@@ -191,7 +195,7 @@ void LightStateController::serializeCurrentState(char *output, int length) {
 /**
  * Saves the current state to spiffs or eeprom
  */
-uint8_t LightStateController::saveCurrentState() {
+uint8_t LightState::Controller::saveCurrentState() {
 #ifdef IS_ESP32
   char json[256];
   serializeCurrentState(json, 256);
@@ -205,7 +209,7 @@ uint8_t LightStateController::saveCurrentState() {
   return LIGHT_STATEFILE_WROTE_SUCCESS;
 }
 
-void LightStateController::printStateDebug(LightState &state) {
+void LightState::Controller::printStateDebug(LightState &state) {
 #ifdef DEBUG
   Serial.println("DEBUG: got new LightState:");
   Serial.printf("  - has state: %s, value: %s\n",
@@ -232,4 +236,6 @@ void LightStateController::printStateDebug(LightState &state) {
 /**
  * Returns current state
  */
-LightState &LightStateController::getCurrentState() { return currentState; }
+LightState::LightState &LightState::Controller::getCurrentState() {
+  return currentState;
+}

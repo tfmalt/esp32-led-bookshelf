@@ -37,27 +37,167 @@ DEFINE_GRADIENT_PALETTE(gr65_hult_gp){0,   247, 176, 247, 48,  255, 136, 255,
                                       89,  220, 29,  226, 160, 7,   82,  178,
                                       216, 1,   124, 109, 255, 1,   124, 109};
 
-void Effects::setup() {
+using namespace Effects;
+
+void Effects::Controller::setup(CRGB* l, const uint16_t n,
+                                LightState::LightState s) {
 #ifdef DEBUG
-  Serial.println("  - Running Effects Setup");
+  Serial.println("[effects] running setup.");
 #endif
+
+  numberOfLeds = n;
+  leds = l;
+  state = s;
+
 #if defined(FFT_ACTIVE) && defined(IS_ESP32)
   fft.setup();
-//   analogReadResolution(12);
-//   analogSetCycles(8);
-//   analogSetSamples(1);
-//   analogSetAttenuation(ADC_11db);
 #endif
+
+  setInitialState();
 }
 
-void Effects::setLightStateController(LightStateController* l) {
-  lightState = l;
+void Effects::Controller::setInitialState() {
+  Serial.printf("[effects] setting initial state: '%s'\n",
+                state.state ? "On" : "Off");
+
+  CRGBSet ledset(leds, numberOfLeds);
+
+  if (state.state == false) {
+    FastLED.setBrightness(0);
+    return;
+  }
+
+  Serial.printf(
+      "[effects] color: r: %i, g: %i, b: %i, x: %.2f, y: %.2f, h: %.2f, s: "
+      "%.2f\n",
+      state.color.r, state.color.g, state.color.b, state.color.x, state.color.y,
+      state.color.h, state.color.s);
+  // ledset = CRGB(state.color.r, state.color.g, state.color.b);
+  setCurrentCommand(Effects::Command::Color);
+
+  Serial.printf("[effects] effect: '%s'\n", state.effect.c_str());
+  setCurrentEffect(state.effect);
+
+  Serial.printf("[effects] brightness: %i\n", state.brightness);
+  setCurrentCommand(Effects::Command::Brightness);
 }
 
-void Effects::setCommandFrames(uint16_t i) { commandFrames = i; }
+/**
+ * Handle an incoming state update
+ */
+void Effects::Controller::handleStateChange(LightState::LightState s) {
+  state = s;
+  Serial.printf("[effects] got state change: %s\n", state.state ? "ON" : "OFF");
 
-void Effects::setCurrentCommand(Command cmd) {
-  LightState state = lightState->getCurrentState();
+  if (state.state == false) {
+    FastLED.setBrightness(0);
+    return;
+  }
+
+  if (state.status.hasEffect) {
+    setCurrentEffect(state.effect);
+
+    if (state.effect == "") {
+      setCurrentCommand(Effects::Command::Color);
+    }
+  }
+
+  if (state.status.hasBrightness) {
+#ifdef DEBUG
+    Serial.printf("[effects]   Got new brightness: '%i'\n", state.brightness);
+#endif
+    setCurrentCommand(Effects::Command::Brightness);
+  }
+
+  if (state.status.hasColor) {
+#ifdef DEBUG
+    Serial.println("[effects]   Got color");
+#endif
+    if (getCurrentEffect() == Effects::Effect::NullEffect) {
+      setCurrentCommand(Effects::Command::Color);
+    } else {
+#ifdef DEBUG
+      Serial.printf("[effects]   effect is: '%s' hue: %.2f\n",
+                    state.effect.c_str(), state.color.h);
+#endif
+      setStartHue(state.color.h);
+    }
+  }
+
+  if (state.status.hasColorTemp) {
+    unsigned int kelvin = (1000000 / state.color_temp);
+#ifdef DEBUG
+    Serial.printf("[effects]   Got color temp: %i mired = %i Kelvin\n",
+                  state.color_temp, kelvin);
+#endif
+
+    unsigned int temp = kelvin / 100;
+
+    double red = 0;
+    if (temp <= 66) {
+      red = 255;
+    } else {
+      red = temp - 60;
+      red = 329.698727446 * (pow(red, -0.1332047592));
+      if (red < 0) red = 0;
+      if (red > 255) red = 255;
+    }
+
+    double green = 0;
+    if (temp <= 66) {
+      green = temp;
+      green = 99.4708025861 * log(green) - 161.1195681661;
+      if (green < 0) green = 0;
+      if (green > 255) green = 255;
+    } else {
+      green = temp - 60;
+      green = 288.1221695283 * (pow(green, -0.0755148492));
+      if (green < 0) green = 0;
+      if (green > 255) green = 255;
+    }
+
+    double blue = 0;
+    if (temp >= 66) {
+      blue = 255;
+    } else {
+      if (temp <= 19) {
+        blue = 0;
+      } else {
+        blue = temp - 10;
+        blue = 138.5177312231 * log(blue) - 305.0447927307;
+        if (blue < 0) blue = 0;
+        if (blue > 255) blue = 255;
+      }
+    }
+
+#ifdef DEBUG
+    Serial.printf("[effects]   RGB [%i, %i, %i]\n", static_cast<uint8_t>(red),
+                  static_cast<uint8_t>(green), static_cast<uint8_t>(blue));
+#endif
+    state.color.r = static_cast<uint8_t>(red);
+    state.color.g = static_cast<uint8_t>(green);
+    state.color.b = static_cast<uint8_t>(blue);
+
+    setCurrentCommand(Effects::Command::Color);
+  }
+
+  if (!state.status.hasColorTemp && !state.status.hasColor &&
+      !state.status.hasBrightness && !state.status.hasEffect) {
+    // assuming turn on is the only thing.
+    setCurrentCommand(Effects::Command::Brightness);
+    setCurrentCommand(Effects::Command::Color);
+  }
+}
+
+// void Effects::Controller::setLightStateController(LightState::Controller* l)
+// {
+//   lightState = l;
+// }
+
+void Effects::Controller::setCommandFrames(uint16_t i) { commandFrames = i; }
+
+void Effects::Controller::setCurrentCommand(Command cmd) {
+  // LightState::LightState& state = lightState->getCurrentState();
   commandFrameCount = 0;
   commandStart = millis();
   currentCommandType = cmd;
@@ -66,30 +206,21 @@ void Effects::setCurrentCommand(Command cmd) {
 
   switch (cmd) {
     case Command::Brightness:
-      currentCommand = &Effects::cmdSetBrightness;
+      cmdQueue[Command::Brightness] = [this]() { cmdSetBrightness(); };
       break;
     case Command::Color:
-      currentCommand = &Effects::cmdFadeTowardColor;
+      cmdQueue[Command::Color] = [this]() { cmdFadeTowardColor(); };
       break;
     case Command::FirmwareUpdate:
-      currentCommand = &Effects::cmdFirmwareUpdate;
+      cmdQueue[Command::FirmwareUpdate] = [this]() { cmdFirmwareUpdate(); };
       break;
     default:
-      currentCommand = &Effects::cmdEmpty;
+      // currentCommand = &Effects::Controller::cmdEmpty;
       currentCommandType = Command::None;
   }
 }
 
-void Effects::setCurrentEffect(String effect) {
-#ifdef DEBUG
-  Serial.printf("  - Effects: Setting new effect: %s\n", effect.c_str());
-#endif
-
-  fill_solid(leds, LED_COUNT, CRGB::Black);
-  setCurrentEffect(getEffectFromString(effect));
-}
-
-Effects::Effect Effects::getEffectFromString(String str) {
+Effects::Effect Effects::Controller::getEffectFromString(std::string str) {
   if (str == "Glitter Rainbow") return Effect::GlitterRainbow;
   if (str == "Rainbow") return Effect::Rainbow;
   if (str == "Gradient") return Effect::Gradient;
@@ -108,66 +239,79 @@ Effects::Effect Effects::getEffectFromString(String str) {
   return Effect::NullEffect;
 }
 
-void Effects::setCurrentEffect(Effect effect) {
-  LightState state = lightState->getCurrentState();
+void Effects::Controller::setCurrentEffect(std::string effect) {
+#ifdef DEBUG
+  Serial.printf("[effects] setting effect: %s\n", effect.c_str());
+#endif
+
+  fill_solid(leds, LED_COUNT, CRGB::Black);
+  setCurrentEffect(getEffectFromString(effect));
+}
+
+void Effects::Controller::setCurrentEffect(Effect effect) {
+  // LightState::LightState& state = lightState->getCurrentState();
   currentEffectType = effect;
 
   switch (effect) {
     case Effect::GlitterRainbow:
-      currentEffect = &Effects::effectGlitterRainbow;
+      currentEffect = [this]() { effectGlitterRainbow(); };
       break;
     case Effect::Rainbow:
-      currentEffect = &Effects::effectRainbow;
+      currentEffect = [this]() { effectRainbow(); };
       break;
     case Effect::Gradient:
-      currentEffect = &Effects::effectGradient;
+      currentEffect = [this]() { effectGradient(); };
       break;
     case Effect::RainbowByShelf:
-      currentEffect = &Effects::effectRainbowByShelf;
+      currentEffect = [this]() { effectRainbowByShelf(); };
       break;
     case Effect::BPM:
-      currentEffect = &Effects::effectBPM;
+      currentEffect = [this]() { effectBPM(); };
       break;
     case Effect::Pride:
-      currentEffect = &Effects::effectPride;
+      currentEffect = [this]() { effectPride(); };
       break;
     case Effect::Colorloop:
-      currentEffect = &Effects::effectColorloop;
+      currentEffect = [this]() { effectColorloop(); };
       break;
     case Effect::WalkingRainbow:
-      currentEffect = &Effects::effectWalkingRainbow;
+      currentEffect = [this]() { effectWalkingRainbow(); };
       break;
     case Effect::VUMeter:
-      currentEffect = &Effects::effectVUMeter;
+      currentEffect = [this]() { effectVUMeter(); };
       break;
     case Effect::MusicDancer:
-      currentEffect = &Effects::effectMusicDancer;
+      currentEffect = [this]() { effectMusicDancer(); };
       break;
     case Effect::Frequencies:
-      currentEffect = &Effects::effectFrequencies;
+      currentEffect = [this]() { effectFrequencies(); };
       break;
     case Effect::Confetti:
-      currentEffect = &Effects::effectConfetti;
+      currentEffect = [this]() { effectConfetti(); };
       break;
     case Effect::Sinelon:
-      currentEffect = &Effects::effectSinelon;
+      currentEffect = [this]() { effectSinelon(); };
       break;
     case Effect::Juggle:
-      currentEffect = &Effects::effectJuggle;
+      currentEffect = [this]() { effectJuggle(); };
       break;
     default:
       currentEffectType = Effect::NullEffect;
-      currentEffect = &Effects::cmdEmpty;
+      currentEffect = [this]() {};
   }
 }
 
-void Effects::runCurrentCommand() { (this->*currentCommand)(); }
+void Effects::Controller::runCurrentCommand() {
+  for (auto func : cmdQueue) {
+    func.second();
+  }
+}
 
-void Effects::runCurrentEffect() { (this->*currentEffect)(); }
+void Effects::Controller::runCurrentEffect() { this->currentEffect(); }
 
-void Effects::cmdEmpty() {}
+void Effects::Controller::cmdEmpty() {}
 
-void Effects::cmdFirmwareUpdate() {
+void Effects::Controller::cmdFirmwareUpdate() {
   fill_solid(leds, LED_COUNT, CRGB::Black);
   // fill_solid(leds, 15, CRGB::White);
   leds[3] = CRGB::White;
@@ -179,8 +323,8 @@ void Effects::cmdFirmwareUpdate() {
   FastLED.show();
 }
 
-void Effects::cmdSetBrightness() {
-  LightState state = lightState->getCurrentState();
+void Effects::Controller::cmdSetBrightness() {
+  // LightState::LightState state = lightState->getCurrentState();
 
   uint8_t target = state.brightness;
   uint8_t current = FastLED.getBrightness();
@@ -192,11 +336,12 @@ void Effects::cmdSetBrightness() {
       commandFrameCount++;
     } else {
 #ifdef DEBUG
-      Serial.printf("  - command: setting brightness DONE [%i] %lu ms.\n",
+      Serial.printf("[effects] command setting brightness DONE [%i] %lu ms.\n",
                     FastLED.getBrightness(), (millis() - commandStart));
 #endif
 
-      setCurrentCommand(Command::None);
+      // setCurrentCommand(Command::None);
+      cmdQueue.erase(Effects::Command::Brightness);
     }
   }
 }
@@ -206,8 +351,8 @@ void Effects::cmdSetBrightness() {
  * Taken from:
  * https://gist.github.com/kriegsman/d0a5ed3c8f38c64adcb4837dafb6e690
  */
-void Effects::nblendU8TowardU8(uint8_t& cur, const uint8_t target,
-                               uint8_t amount) {
+void Effects::Controller::nblendU8TowardU8(uint8_t& cur, const uint8_t target,
+                                           uint8_t amount) {
   if (cur == target) return;
 
   if (cur < target) {
@@ -228,7 +373,8 @@ void Effects::nblendU8TowardU8(uint8_t& cur, const uint8_t target,
  * Taken from:
  * https://gist.github.com/kriegsman/d0a5ed3c8f38c64adcb4837dafb6e690
  */
-CRGB Effects::fadeTowardColor(CRGB& cur, const CRGB& target, uint8_t amount) {
+CRGB Effects::Controller::fadeTowardColor(CRGB& cur, const CRGB& target,
+                                          uint8_t amount) {
   nblendU8TowardU8(cur.red, target.red, amount);
   nblendU8TowardU8(cur.green, target.green, amount);
   nblendU8TowardU8(cur.blue, target.blue, amount);
@@ -240,8 +386,9 @@ CRGB Effects::fadeTowardColor(CRGB& cur, const CRGB& target, uint8_t amount) {
  * amount This function modifies the pixel array in place. Taken from:
  * https://gist.github.com/kriegsman/d0a5ed3c8f38c64adcb4837dafb6e690
  */
-void Effects::fadeTowardColor(CRGB* L, uint16_t N, const CRGB& bgColor,
-                              uint8_t fadeAmount) {
+void Effects::Controller::fadeTowardColor(CRGB* L, uint16_t N,
+                                          const CRGB& bgColor,
+                                          uint8_t fadeAmount) {
   uint16_t check = 0;
   EVERY_N_MILLIS(4) {
     for (uint16_t i = 0; i < N; i++) {
@@ -252,29 +399,22 @@ void Effects::fadeTowardColor(CRGB* L, uint16_t N, const CRGB& bgColor,
 
   if (check == numberOfLeds) {
 #ifdef DEBUG
-    Serial.printf("  - fade towards color done in %lu ms.\n",
+    Serial.printf("[effects] fade towards color done in %lu ms.\n",
                   (millis() - commandStart));
 #endif
-    setCurrentCommand(Command::None);
+    // setCurrentCommand(Command::None);
+    cmdQueue.erase(Effects::Command::Color);
   }
 }
 
 /**
  * command tells strip to Fade towards a color
  */
-void Effects::cmdFadeTowardColor() {
-  LightState state = lightState->getCurrentState();
+void Effects::Controller::cmdFadeTowardColor() {
+  // LightState::LightState state = lightState->getCurrentState();
   CRGB targetColor(state.color.r, state.color.g, state.color.b);
 
   fadeTowardColor(leds, numberOfLeds, targetColor, 2);
-}
-
-/**
- * setLeds
- */
-void Effects::setLeds(CRGB* l, const uint16_t& n) {
-  numberOfLeds = n;
-  leds = l;
 }
 
 /**
@@ -282,7 +422,7 @@ void Effects::setLeds(CRGB* l, const uint16_t& n) {
  *
  * @return Effects::Effect current effect type
  */
-Effects::Effect Effects::getCurrentEffect() {
+Effects::Effect Effects::Controller::getCurrentEffect() {
   // returns current effect
   return currentEffectType;
 }
@@ -290,302 +430,15 @@ Effects::Effect Effects::getCurrentEffect() {
 /**
  * Sets the start hue
  */
-void Effects::setStartHue(float hue) {
+void Effects::Controller::setStartHue(float hue) {
   startHue = static_cast<uint8_t>(hue * (256.0 / 360.0));
   confettiHue = startHue;
 }
 
-// ======================================================================
-// FFT Helper functions
-// ======================================================================
-
-// unsigned long newtime = 0;
-// unsigned long oldtime = 0;
-// unsigned long sampling_period = round(1000000 * (1.0 / SAMPLING_FREQUENCY));
-
-// unsigned long Effects::sampleDelay() {
-//   newtime = micros() - oldtime;
-//   oldtime = newtime;
-//
-//   return (newtime + sampling_period);
-// }
-
-// 5 per second for 20 seconds
-
-// #define AVG_MAX 200
-// #define AVG_BASE 2047
-// #define FFT_LOW_CUTOFF 32000
-// #define FFT_HIGH_CUTOFF 320000
-//
-// uint16_t AVG_SAMP[AVG_MAX];
-// uint32_t AVG_CTR = 0;
-// double AMP_FACTOR = 1.00;
-
-// void Effects::fftComputeSampleset() {
-//   // unsigned long start = micros();
-//   uint16_t sample;
-//
-//   for (int i = 0; i < FFT_SAMPLES; i++) {
-//     sample = analogRead(FFT_INPUT_PIN);
-//
-//     EVERY_N_MILLIS(200) {
-//       AVG_SAMP[(AVG_CTR % AVG_MAX)] = sample;
-//       AVG_CTR++;
-//     }
-//
-//     int adjusted = (int)(sample * AMP_FACTOR);
-//     if (adjusted < 0) adjusted = 0;
-//     if (adjusted > 4095) adjusted = 4095;
-//
-//     vReal[i] = adjusted;
-//     vImag[i] = 0;
-//   }
-//   // unsigned long doneSamples = micros();
-//
-//   FFT.Windowing(vReal, FFT_SAMPLES, FFT_WIN_TYP_HAMMING, FFT_FORWARD);
-//   FFT.Compute(vReal, vImag, FFT_SAMPLES, FFT_FORWARD);
-//   FFT.ComplexToMagnitude(vReal, vImag, FFT_SAMPLES);
-//   // unsigned long doneCompute = micros();
-//
-//   EVERY_N_MILLIS(1000) {
-//     // Calculate average amplitude every 5 seconds.
-//     uint32_t avg_sum = 0;
-//     for (int i = 0; i < AVG_MAX; i++) {
-//       avg_sum += AVG_SAMP[i];
-//     }
-//
-//     double avg =
-//         (AVG_CTR > 200) ? avg_sum / (double)AVG_MAX : avg_sum /
-//         (double)AVG_CTR;
-//     AMP_FACTOR = (avg > 0) ? AVG_BASE / avg : 0;
-//
-// #ifdef DEBUG
-//     Serial.printf("Average: raw: %6i\t avg: %8.2f\tfac: %8.2f\tadj: %6i\n",
-//                   sample, avg, AMP_FACTOR, (int)(avg * AMP_FACTOR));
-// #endif
-//   }
-// }
-
-// void Effects::fftFillBuckets() {
-//   int next = 0;
-//   int prev = 0;
-//   int curr = 0;
-//
-//   // ====================================================================
-//   // 0: Bass: 60 - 250 Hz
-//   curr = (int)vReal[2];
-//   next = (int)vReal[3];
-//
-//   if (next > (curr * 2.19)) curr = 0;
-//
-//   //  Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
-//
-//   curr -= FFT_LOW_CUTOFF;
-//   if (curr < 0) curr = 0;
-//
-//   curr = constrain(curr, 0, FFT_HIGH_CUTOFF);
-//   curr = map(curr, 0, FFT_HIGH_CUTOFF, 0, 255);
-//
-//   buckets[0] = (uint8_t)curr;
-//
-//   // ====================================================================
-//   // 1: Low midrange: 250 - 500 Hz
-//   curr = 0;
-//   next = 0;
-//   prev = (int)vReal[2];
-//
-//   for (int i = 3; i < 6; i++) {
-//     curr = max((int)vReal[i], curr);
-//   }
-//
-//   //   for (int i = 6; i < 11; i++) {
-//   //     next = max((int)vReal[i], next);
-//   //   }
-//
-//   if (prev > (curr * 0.47)) curr = 0;
-//   // if (next > (curr * 0.4)) curr = 0;
-//
-//   //   Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
-//   curr -= FFT_LOW_CUTOFF;
-//   if (curr < 0) curr = 0;
-//
-//   curr = constrain(curr, 0, FFT_HIGH_CUTOFF);
-//   curr = map(curr, 0, FFT_HIGH_CUTOFF, 0, 255);
-//   buckets[1] = (uint8_t)curr;
-//
-//   // ====================================================================
-//   // 2: Midrange: 500 - 1 kHz
-//   // prev = 0;
-//   curr = 0;
-//   // next = 0;
-//
-//   // for (int i = 2; i < 6; i++) {
-//   //   prev = max((int)vReal[i], prev);
-//   // }
-//   //
-//   for (int i = 6; i < 12; i++) {
-//     curr = (vReal[i] > curr) ? vReal[i] : curr;
-//   }
-//   //
-//   //   for (int i = 11; i < 21; i++) {
-//   //     next = (vReal[i] > next) ? vReal[i] : next;
-//   //   }
-//   //
-//   //   if (next > (curr * 0.36)) curr = 0;
-//   //   if (prev > (curr * 2.68)) curr = 0;
-//
-//   // Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
-//   curr -= FFT_LOW_CUTOFF;
-//   if (curr < 0) curr = 0;
-//
-//   curr = constrain(curr, 0, FFT_HIGH_CUTOFF);
-//   curr = map(curr, 0, FFT_HIGH_CUTOFF, 0, 255);
-//
-//   buckets[2] = (uint8_t)curr;
-//
-//   // ====================================================================
-//   // 3: Midrange: 1 - 2 kHz
-//   curr = 0;
-//   // next = 0;
-//   // prev = 0;
-//   //
-//   //   for (int i = 2; i < 11; i++) {
-//   //     prev = max((int)vReal[i], prev);
-//   //   }
-//   //
-//   for (int i = 12; i < 24; i++) {
-//     curr = max((int)vReal[i], curr);
-//   }
-//   //
-//   //   for (int i = 21; i < 41; i++) {
-//   //     next = max((int)vReal[i], next);
-//   //   }
-//   //
-//   //   if (next > (curr * 0.29)) curr = 0;
-//   //   if (prev > (curr * 2.84)) curr = 0;
-//
-//   //  Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
-//  curr -= FFT_LOW_CUTOFF;
-//  if (curr < 0) curr = 0;
-//
-//  curr = constrain(curr, 0, FFT_HIGH_CUTOFF);
-//  curr = map(curr, 0, FFT_HIGH_CUTOFF, 0, 255);
-//
-//  buckets[3] = (uint8_t)curr;
-//
-//  // ====================================================================
-//  // 4: Upper Midrange: 2 - 4 kHz
-//  curr = 0;
-//  // next = 0;
-//  //
-//  //   for (int i = 11; i < 21; i++) {
-//  //     prev = max((int)vReal[i], prev);
-//  //   }
-//  //
-//  for (int i = 24; i < 48; i++) {
-//    curr = max((int)vReal[i], curr);
-//  }
-//  //
-//  //   for (int i = 41; i < 80; i++) {
-//  //     next = max((int)vReal[i], next);
-//  //   }
-//  //
-//  //   if (prev > (curr * 3.74)) curr = 0;
-//  //   if (next > (curr * 0.30)) curr = 0;
-//
-//  //  Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
-//  curr -= FFT_LOW_CUTOFF;
-//  if (curr < 0) curr = 0;
-//
-//  curr = constrain(curr, 0, FFT_HIGH_CUTOFF);
-//  curr = map(curr, 0, FFT_HIGH_CUTOFF, 0, 255);
-//
-//  buckets[4] = (uint8_t)curr;
-//
-//  // ====================================================================
-//  //   // 5: precence: 4 - 6 kHz
-//  curr = 0;
-//  // next = 0;
-//  //
-//  //   for (int i = 21; i < 40; i++) {
-//  //     prev = max((int)vReal[i], prev);
-//  //   }
-//  //
-//  for (int i = 48; i < 72; i++) {
-//    curr = max((int)vReal[i], curr);
-//  }
-//  //
-//  //   for (int i = 60; i < 240; i++) {
-//  //     next = max((int)vReal[i], next);
-//  //   }
-//  //
-//  //   if (prev > (curr * 1.10)) curr = 0;
-//  //   if (next > (curr * 0.86)) curr = 0;
-//
-//  //   Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
-//  curr -= FFT_LOW_CUTOFF;
-//  if (curr < 0) curr = 0;
-//
-//  curr = constrain(curr, 0, FFT_HIGH_CUTOFF);
-//  curr = map(curr, 0, FFT_HIGH_CUTOFF, 0, 255);
-//
-//  buckets[5] = (uint8_t)curr;
-//
-//   // ====================================================================
-//   // 6: Brilliance: 6 - 20 kHz kHz
-//   curr = 0;
-//   // next = 0;
-//   //
-//   //   for (int i = 40; i < 60; i++) {
-//   //     prev = max((int)vReal[i], prev);
-//   //   }
-//   //
-//   for (int i = 71; i < 240; i++) {
-//     curr = max((int)vReal[i], curr);
-//   }
-//   //
-//   //   if (prev > (curr * 1.30)) curr = 0;
-//
-//   // Serial.printf("%6i\t%6i\t%6i\t", prev, curr, next);
-//   curr -= FFT_LOW_CUTOFF;
-//   if (curr < 0) curr = 0;
-//
-//   curr = constrain(curr, 0, FFT_HIGH_CUTOFF);
-//   curr = map(curr, 0, FFT_HIGH_CUTOFF, 0, 255);
-//
-//   buckets[6] = (uint8_t)curr;
-//
-//   // ====================================================================
-//   // Debug printing:
-//   // ====================================================================
-//   // int FROM = 70;
-//   // int TO = 175;
-//   // int MOD = 2;
-//   //
-//   //   for (int i = FROM; i < TO; i++) {
-//   //     if (i % MOD == 0) Serial.printf("%6i\t", (int)vReal[i]);
-//   //   }
-//   //   Serial.println();
-//   //
-//   //   EVERY_N_MILLIS(1000) {
-//   //     Serial.println();
-//   //     Serial.printf("%6s\t%6s\t%6s\t", "prev", "curr", "next");
-//   //
-//   //     for (int i = FROM; i < TO; i++) {
-//   //       if (i % MOD == 0) Serial.printf("%6i\t", i);
-//   //     }
-//   //     Serial.println();
-//   //     for (int i = FROM; i < (TO + 3); i++) {
-//   //       if (i % MOD == 0) Serial.printf("------\t");
-//   //     }
-//   //     Serial.println();
-//   //   }
-// }
-
 // =====================================================================
 // EFFECTS
 // =====================================================================
-void Effects::effectRainbow() {
+void Effects::Controller::effectRainbow() {
   // fills the leds with rainbow colors
   fill_rainbow(leds, numberOfLeds, startHue, 2);
 }
@@ -594,7 +447,7 @@ uint16_t GRAD_INDEX = 0;
 CRGBPalette256 pal = Sunset_Real_gp;
 uint8_t j = 0;
 
-void Effects::effectGradient() {
+void Effects::Controller::effectGradient() {
   CRGBPalette256 palettes[6] = {RdYlBu_gp, Paired_07_gp, bhw1_05_gp,
                                 summer_gp, gr65_hult_gp, Sunset_Real_gp};
 
@@ -616,7 +469,7 @@ void Effects::effectGradient() {
   }
 }
 
-void Effects::effectRainbowByShelf() {
+void Effects::Controller::effectRainbowByShelf() {
   CRGBSet ledset(leds, numberOfLeds);
   ledset(0, 63).fill_rainbow(startHue, 4);
   ledset(64, 127) = ledset(63, 0);
@@ -632,19 +485,19 @@ void Effects::effectRainbowByShelf() {
   ledset(320, 383) = ledset(319, 256);
 }
 
-void Effects::addGlitter(fract8 chanceOfGlitter) {
+void Effects::Controller::addGlitter(fract8 chanceOfGlitter) {
   if (random8() < chanceOfGlitter) {
     leds[random16(numberOfLeds)] += CRGB::White;
   }
 }
 
-void Effects::effectGlitterRainbow() {
+void Effects::Controller::effectGlitterRainbow() {
   // built-in FastLED rainbow, plus some random sparkly glitter
   effectRainbow();
   EVERY_N_MILLIS(1000 / FPS) { addGlitter(160); }
 }
 
-void Effects::effectConfetti() {
+void Effects::Controller::effectConfetti() {
   // random colored speckles that blink in and fade smoothly
   EVERY_N_SECONDS(2) { confettiHue = confettiHue + 8; }
 
@@ -658,7 +511,7 @@ void Effects::effectConfetti() {
 }
 
 // a colored dot sweeping back and forth, with fading trails
-void Effects::effectSinelon() {
+void Effects::Controller::effectSinelon() {
   EVERY_N_MILLIS(8) { fadeToBlackBy(leds, LED_COUNT, 16); }
 
   EVERY_N_MILLIS(200) { startHue += 1; }
@@ -675,7 +528,7 @@ void Effects::effectSinelon() {
 /**
  * colored stripes pulsing at a defined Beats-Per-Minute (BPM)
  */
-void Effects::effectBPM() {
+void Effects::Controller::effectBPM() {
   uint8_t BeatsPerMinute = 64;
   CRGBPalette16 palette = PartyColors_p;
   uint8_t beat = beatsin8(BeatsPerMinute, 64, 255);
@@ -685,7 +538,7 @@ void Effects::effectBPM() {
   }
 }
 
-void Effects::effectPride() {
+void Effects::Controller::effectPride() {
   CRGBSet ledset(leds, LED_COUNT);
 
   uint8_t num_colors = 6;
@@ -699,7 +552,7 @@ void Effects::effectPride() {
   }
 }
 
-void Effects::effectWalkingRainbow() {
+void Effects::Controller::effectWalkingRainbow() {
   EVERY_N_MILLIS(1000 / 60) {
     uint8_t inc = 2;  // 256 / LED_COUNT;
     uint8_t hue = startHue;
@@ -713,7 +566,7 @@ void Effects::effectWalkingRainbow() {
   }
 }
 
-void Effects::effectColorloop() {
+void Effects::Controller::effectColorloop() {
   // EVERY_N_SECONDS(2) { Serial.printf("  - Running colorloop: %i\n",
   // startHue); }
 
@@ -727,7 +580,7 @@ void Effects::effectColorloop() {
 /** =====================================================================
  * FFT based spectrum analyzer disco lights
  */
-void Effects::effectVUMeter() {
+void Effects::Controller::effectVUMeter() {
   CRGBSet ledset(leds, LED_COUNT);
 
   EVERY_N_MILLIS(1000 / 25) {
@@ -755,7 +608,7 @@ void Effects::effectVUMeter() {
 }
 
 CRGBPalette256 colPal = Sunset_Real_gp;
-void Effects::effectMusicDancer() {
+void Effects::Controller::effectMusicDancer() {
   CRGBSet ledset(leds, LED_COUNT);
   // ledset(0, LED_COUNT) = CRGB::Black;
 
@@ -838,7 +691,7 @@ void Effects::effectMusicDancer() {
 }
 
 uint8_t freqBuckets[LED_COUNT];
-void Effects::effectFrequencies() {
+void Effects::Controller::effectFrequencies() {
   EVERY_N_SECONDS(10) { Serial.println("  - effect: display frequencies"); }
 
   CRGBSet ledset(leds, LED_COUNT);
@@ -849,7 +702,7 @@ void Effects::effectFrequencies() {
 /**
  * eight colored dots, weaving in and out of sync with each other
  */
-void Effects::effectJuggle() {
+void Effects::Controller::effectJuggle() {
   EVERY_N_MILLIS(1000 / FPS) {
     fadeToBlackBy(leds, numberOfLeds, 20);
     byte dothue = 0;

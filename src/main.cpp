@@ -20,7 +20,7 @@
 #include <FastLED.h>
 
 #include <Effects.hpp>
-#include <LightStateController.hpp>
+#include <LightState.hpp>
 
 #ifdef IS_ESP32
 #include <ArduinoOTA.h>
@@ -42,8 +42,8 @@ FASTLED_USING_NAMESPACE
 CRGBArray<LED_COUNT> leds;
 
 LedshelfConfig config;
-Effects effects;
-LightStateController lightState;
+Effects::Controller effects;
+LightState::Controller lightState;
 
 EventDispatcher hub;
 
@@ -67,13 +67,13 @@ uint8_t updateProgress = 0;
 // Run by arduino setup function.
 void setupFastLED() {
 #ifdef DEBUG
-  Serial.println("Setting up LED");
-  Serial.printf("  - x number of leds: %i, max mA: %i\n", LED_COUNT, LED_mA);
+  Serial.println("[main] Setting up LED:");
+  Serial.printf("[main]   number of leds: %i, max mA: %i\n", LED_COUNT, LED_mA);
 #endif
 
 #ifdef LED_CLOCK
 #ifdef DEBUG
-  Serial.printf("  - type: SK9822, data: %i, clock: %i.\n", LED_DATA,
+  Serial.printf("[main]   type: SK9822, data: %i, clock: %i.\n", LED_DATA,
                 LED_CLOCK);
 #endif
   FastLED
@@ -82,7 +82,7 @@ void setupFastLED() {
       .setCorrection(TypicalSMD5050);
 #else
 #ifdef DEBUG
-  Serial.printf("  - type: WS2812B, data: %i\n", LED_DATA);
+  Serial.printf("[main]   type: WS2812B, data: %i\n", LED_DATA);
 #endif
   FastLED.addLeds<LED_TYPE, LED_DATA, LED_COLOR_ORDER>(leds, LED_COUNT)
       .setCorrection(TypicalSMD5050);
@@ -90,21 +90,20 @@ void setupFastLED() {
 
   FastLED.setMaxPowerInVoltsAndMilliamps(5, LED_mA);
 
-  LightState &currentState = lightState.getCurrentState();
+  LightState::LightState &currentState = lightState.getCurrentState();
 
 #ifdef DEBUG
-  Serial.printf("  - state is: '%s'\n", currentState.state ? "On" : "Off");
+  Serial.printf("[main] state is: '%s', effect: '%s'\n",
+                currentState.state ? "On" : "Off", currentState.effect.c_str());
   FastLED.countFPS(FPS);
 #endif
 
   FastLED.setBrightness(currentState.state ? currentState.brightness : 0);
 
-  // effects.setFPS(FPS);
-  effects.setup();
-  effects.setLightStateController(&lightState);
-  effects.setLeds(leds, LED_COUNT);
-  effects.setCurrentEffect(currentState.effect);
-  effects.setStartHue(currentState.color.h);
+  effects.setup(leds, LED_COUNT, currentState);
+
+  hub.onStateChange(
+      [](LightState::LightState s) { effects.handleStateChange(s); });
 }
 // END OF setupFastLED
 

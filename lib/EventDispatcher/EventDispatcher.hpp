@@ -7,9 +7,10 @@
 
 #include <Effects.hpp>
 #include <LedshelfConfig.hpp>
-#include <LightStateController.hpp>
+#include <LightState.hpp>
 #include <map>
 #include <string>
+#include <vector>
 
 #ifdef IS_ESP32
 #include <MQTTController.hpp>
@@ -22,6 +23,9 @@
 // Typedef for the lookup map for the mqtt event handlers
 typedef std::map<std::string, std::function<void(std::string, std::string)>>
     TopicHandlerMap;
+
+typedef std::function<void(LightState::LightState)> StateChangeHandler;
+typedef std::function<void()> FirmwareUpdateHandler;
 
 class EventDispatcher {
  public:
@@ -61,8 +65,21 @@ class EventDispatcher {
     mqtt.onError([this](std::string err) { this->handleError(err); });
   }
 
-  void setEffects(Effects *e) { effects = e; }
-  void setLightState(LightStateController *l) { lightState = l; }
+  EventDispatcher &onStateChange(StateChangeHandler callback) {
+    _stateHandlers.push_back(callback);
+    return *this;
+  };
+  EventDispatcher &onFirmwareUpdate(FirmwareUpdateHandler callback) {
+    _updateHandlers.push_back(callback);
+    return *this;
+  };
+
+  EventDispatcher &onQuery();
+  EventDispatcher &onError();
+  EventDispatcher &onDisconnect();
+
+  void setEffects(Effects::Controller *e) { effects = e; }
+  void setLightState(LightState::Controller *l) { lightState = l; }
 
   void publishInformation(const char *message) {
     mqtt.publish(config.information_topic, message);
@@ -93,9 +110,11 @@ class EventDispatcher {
 
  private:
   TopicHandlerMap handlers;
+  std::vector<StateChangeHandler> _stateHandlers;
+  std::vector<FirmwareUpdateHandler> _updateHandlers;
   LedshelfConfig config;
-  Effects *effects;
-  LightStateController *lightState;
+  Effects::Controller *effects;
+  LightState::Controller *lightState;
 
 #ifdef IS_ESP32
   MQTTController mqtt;
@@ -109,10 +128,10 @@ class EventDispatcher {
   }
 
   void handleMessage(std::string topic, std::string message) {
-    Serial.printf("  - Handle Message: topic: %s\n", topic.c_str());
+    Serial.printf("[hub] handle message: topic: %s\n", topic.c_str());
 
     if (isFirmwareUpdateActive()) {
-      Serial.println("    - Firmware update active. Ignoring command.");
+      Serial.println("[hub]   Firmware update active. Ignoring command.");
       publishInformation("Firmware update active. Ignoring command.");
       return;
     }
@@ -120,7 +139,7 @@ class EventDispatcher {
     if (handlers.find(topic) != handlers.end()) {
       handlers[topic](topic, message);
     } else {
-      Serial.println("Error: Got end iterator. Unknown mqtt topic.");
+      Serial.println("[hub] ERROR: Got end iterator. Unknown mqtt topic.");
     }
   }
 
@@ -146,119 +165,21 @@ class EventDispatcher {
   }
 
   void handleCommand(std::string topic, std::string message) {
-    Serial.printf("Handle Command: %s\n", message.c_str());
+    Serial.printf("[hub] handle command: %s\n", message.c_str());
 
     if (this->lightState == nullptr) {
       Serial.println("  ERROR: Lightstate not set. got nullptr.");
       return;
     }
 
-    this->lightState->parseNewState(message);
-    _handleStateChange();
+    LightState::LightState state = this->lightState->parseNewState(message);
+
+    for (auto callback : _stateHandlers) {
+      callback(state);
+    }
+
     std::string json = this->lightState->getCurrentStateAsJSON();
     mqtt.publish(config.state_topic, json);
-  }
-
-  /**
-   * Handle the actual state update
-   */
-  void _handleStateChange() {
-    LightState &state = this->lightState->getCurrentState();
-
-    if (state.state == false) {
-#ifdef DEBUG
-      Serial.println("- Told to turn off");
-#endif
-      FastLED.setBrightness(0);
-      return;
-    }
-
-    if (state.status.hasBrightness) {
-#ifdef DEBUG
-      Serial.printf("- Got new brightness: '%i'\n", state.brightness);
-#endif
-      effects->setCurrentCommand(Effects::Command::Brightness);
-    } else if (state.status.hasColor) {
-#ifdef DEBUG
-      Serial.println("  - Got color");
-#endif
-      if (effects->getCurrentEffect() == Effects::Effect::NullEffect) {
-        effects->setCurrentCommand(Effects::Command::Color);
-      } else {
-#ifdef DEBUG
-        Serial.printf("    - Effect is: '%s' hue: %.2f\n", state.effect.c_str(),
-                      state.color.h);
-#endif
-        effects->setStartHue(state.color.h);
-      }
-    } else if (state.status.hasEffect) {
-#ifdef DEBUG
-      Serial.printf("  - MQTT: Got effect '%s'. Setting it.\n",
-                    state.effect.c_str());
-#endif
-      effects->setCurrentEffect(state.effect);
-      if (state.effect == "") {
-        effects->setCurrentCommand(Effects::Command::Color);
-      }
-    } else if (state.status.hasColorTemp) {
-      unsigned int kelvin = (1000000 / state.color_temp);
-#ifdef DEBUG
-      Serial.printf("  - Got color temp: %i mired = %i Kelvin\n",
-                    state.color_temp, kelvin);
-#endif
-
-      unsigned int temp = kelvin / 100;
-
-      double red = 0;
-      if (temp <= 66) {
-        red = 255;
-      } else {
-        red = temp - 60;
-        red = 329.698727446 * (pow(red, -0.1332047592));
-        if (red < 0) red = 0;
-        if (red > 255) red = 255;
-      }
-
-      double green = 0;
-      if (temp <= 66) {
-        green = temp;
-        green = 99.4708025861 * log(green) - 161.1195681661;
-        if (green < 0) green = 0;
-        if (green > 255) green = 255;
-      } else {
-        green = temp - 60;
-        green = 288.1221695283 * (pow(green, -0.0755148492));
-        if (green < 0) green = 0;
-        if (green > 255) green = 255;
-      }
-
-      double blue = 0;
-      if (temp >= 66) {
-        blue = 255;
-      } else {
-        if (temp <= 19) {
-          blue = 0;
-        } else {
-          blue = temp - 10;
-          blue = 138.5177312231 * log(blue) - 305.0447927307;
-          if (blue < 0) blue = 0;
-          if (blue > 255) blue = 255;
-        }
-      }
-
-#ifdef DEBUG
-      Serial.printf("    - RGB [%i, %i, %i]\n", static_cast<uint8_t>(red),
-                    static_cast<uint8_t>(green), static_cast<uint8_t>(blue));
-#endif
-      state.color.r = static_cast<uint8_t>(red);
-      state.color.g = static_cast<uint8_t>(green);
-      state.color.b = static_cast<uint8_t>(blue);
-
-      effects->setCurrentCommand(Effects::Command::Color);
-    } else {
-      // assuming turn on is the only thing.
-      effects->setCurrentCommand(Effects::Command::Brightness);
-    }
   }
 
   void handleStatus(std::string topic, std::string message) {

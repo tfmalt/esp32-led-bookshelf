@@ -4,14 +4,44 @@
 #include <Arduino.h>
 #include <FastLED.h>
 
-#include <LightStateController.hpp>
+#include <LightState.hpp>
+#include <functional>
+#include <map>
 
-class Effects {
+namespace Effects {
+
+enum Command { Null, None, Empty, Brightness, Color, FirmwareUpdate };
+enum Effect {
+  Confetti,
+  BPM,
+  GlitterRainbow,
+  Rainbow,
+  Gradient,
+  RainbowByShelf,
+  Juggle,
+  Sinelon,
+  Pride,
+  Colorloop,
+  WalkingRainbow,
+  VUMeter,
+  MusicDancer,
+  Frequencies,
+  NullEffect,
+  EmptyEffect,
+  NoEffect
+};
+
+typedef std::function<void()> EffectFunction;
+typedef std::function<void()> CmdFunction;
+typedef std::map<Command, CmdFunction> CmdQueue;
+
+class Controller {
  private:
-  typedef void (Effects::*LightCmd)();
-  LightCmd currentCommand;
-  LightCmd currentEffect;
-  LightStateController *lightState;
+  // typedef void (Effects::Controller::*LightCmd)();
+  // LightCmd currentCommand;
+  CmdQueue cmdQueue;
+  EffectFunction currentEffect;
+  LightState::LightState state;
   CRGB *leds;
 
   uint16_t numberOfLeds = LED_COUNT;
@@ -20,10 +50,6 @@ class Effects {
   uint16_t commandFrameCount = 0;
   uint16_t commandFrames = 0;
 
-  // unsigned long sampleDelay();
-  // void fftComputeSampleset();
-  // void fftFillBuckets();
-  // void fftFillBucketsSimple();
   void cmdEmpty();
   void cmdSetBrightness();
   void cmdFadeTowardColor();
@@ -50,54 +76,36 @@ class Effects {
   void effectJuggle();
   void effectFrequencies();
 
- public:
-  enum Command { Null, None, Empty, Brightness, Color, FirmwareUpdate };
-  enum Effect {
-    Confetti,
-    BPM,
-    GlitterRainbow,
-    Rainbow,
-    Gradient,
-    RainbowByShelf,
-    Juggle,
-    Sinelon,
-    Pride,
-    Colorloop,
-    WalkingRainbow,
-    VUMeter,
-    MusicDancer,
-    Frequencies,
-    NullEffect,
-    EmptyEffect,
-    NoEffect
-  };
+  void setInitialState();
 
+ public:
   Command currentCommandType;
   Effect currentEffectType;
   ulong commandStart = 0;
 
-  Effects() {
-    this->currentCommand = &Effects::cmdEmpty;
-    this->currentEffect = &Effects::cmdEmpty;
+  Controller() {
+    // this->currentCommand = &Effects::Controller::cmdEmpty;
+    this->currentEffect = []() {};
 
     this->currentCommandType = Command::None;
     this->currentEffectType = Effect::NullEffect;
   };
 
-  void setup();
+  void setup(CRGB *l, const uint16_t n, LightState::LightState s);
 
+  void handleStateChange(LightState::LightState state);
   void setCurrentCommand(Command cmd);
-  void setCurrentEffect(String effect);
+  void setCurrentEffect(std::string effect);
   void setCurrentEffect(Effect effect);
-  Effect getEffectFromString(String str);
+  Effect getEffectFromString(std::string str);
   void runCurrentCommand();
   void runCurrentEffect();
   // void setFPS(uint8_t f);
-  void setLightStateController(LightStateController *l);
+  // void setLightStateController(LightState::Controller *l);
   void setCommandFrames(uint16_t i);
-  void setLeds(CRGB *l, const uint16_t &n);
   Effect getCurrentEffect();
   void setStartHue(float hue);
 };
+}  // namespace Effects
 
 #endif  // Effects_h
