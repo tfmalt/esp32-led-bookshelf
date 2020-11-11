@@ -2,7 +2,7 @@
 #define EVENTDISPATCHER_HPP
 
 #include <Arduino.h>
-#include <ArduinoOTA.h>
+// #include <ArduinoOTA.h>
 #include <FastLED.h>
 
 #include <Effects.hpp>
@@ -55,6 +55,8 @@ class EventDispatcher {
       this->handleUpdate(topic, message);
     };
   };
+
+  ~EventDispatcher(){};
 
   void setup() {
     mqtt.setup();
@@ -143,6 +145,9 @@ class EventDispatcher {
     }
   }
 
+  // ========================================================================
+  // Handlers for MQTT Controller events.
+  // ========================================================================
   void handleReady() {
     // got ready handler
     Serial.println("[hub] Got MQTT Ready");
@@ -160,15 +165,14 @@ class EventDispatcher {
     Serial.printf("[hub] Handle Error: %s\n", error.c_str());
   }
 
-  void handleState(std::string topic, std::string message) {
-    Serial.printf("Handle State: %s\n", message.c_str());
-  }
-
+  // ========================================================================
+  // Handlers for MQTT Topic events.
+  // ========================================================================
   void handleCommand(std::string topic, std::string message) {
     Serial.printf("[hub] handle command: %s\n", message.c_str());
 
     if (this->lightState == nullptr) {
-      Serial.println("  ERROR: Lightstate not set. got nullptr.");
+      Serial.println("[hub] ERROR: Lightstate not set. got nullptr.");
       return;
     }
 
@@ -182,32 +186,36 @@ class EventDispatcher {
     mqtt.publish(config.state_topic, json);
   }
 
-  void handleStatus(std::string topic, std::string message) {
-    Serial.printf("Handle Status: %s\n", message.c_str());
-  }
-
-  void handleQuery(std::string topic, std::string message) {
-    Serial.printf("Handle Query: %s\n", message.c_str());
-  }
-
-  void handleInformation(std::string topic, std::string message) {
-    Serial.printf("Handle Information: %s\n", message.c_str());
-  }
-
   void handleUpdate(std::string topic, std::string message) {
-    Serial.printf("Handle Update: %s\n", message.c_str());
+    Serial.printf("[hub] Handle Update: %s\n", message.c_str());
 
     publishInformation(
         "Got update notification. Getting ready to perform firmware update.");
-#ifdef DEBUG
-    Serial.println("Running ArduinoOTA");
-#endif
-    ArduinoOTA.begin();
+    //  #ifdef DEBUG
+    //      Serial.println("Running ArduinoOTA");
+    //  #endif
 
-    effects->setCurrentEffect(Effects::Effect::NullEffect);
-    effects->setCurrentCommand(Effects::Command::FirmwareUpdate);
-    effects->runCurrentCommand();
+    for (auto f : _updateHandlers) {
+      f();
+    }
+  }
+
+  void handleQuery(std::string topic, std::string message) {
+    Serial.printf("[hub] Handle Query: %s\n", message.c_str());
+  }
+
+  void handleState(std::string topic, std::string message) {
+    Serial.printf("[hub] Handle State: %s\n", message.c_str());
+  }
+
+  void handleStatus(std::string topic, std::string message) {
+    Serial.printf("[hub] Handle Status: %s\n", message.c_str());
+  }
+
+  void handleInformation(std::string topic, std::string message) {
+    Serial.printf("[hub] Handle Information: %s\n", message.c_str());
   }
 };
 
+extern EventDispatcher EventHub;
 #endif  // EVENTDISPATCHER_HPP

@@ -12,6 +12,9 @@
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", 3600, 60000);
 
+/**
+ * Setup this instance of controller
+ */
 MQTTController &MQTTController::setup() {
 #ifdef DEBUG
   Serial.printf("[mqtt] Setting up client: %s:%i\n", config.mqtt_server.c_str(),
@@ -50,6 +53,43 @@ MQTTController &MQTTController::setup() {
 
   Serial.println("[mqtt] Setup Finished.");
   return *this;
+}
+
+/**
+ * Connect
+ */
+void MQTTController::connect() {
+  IPAddress mqttip;
+  WiFi.hostByName(config.mqtt_server.c_str(), mqttip);
+
+  while (!client.connected()) {
+#ifdef DEBUG
+    Serial.printf("[mqtt] Attempting connection to %s:%i as \"%s\" ...",
+                  config.mqtt_server.c_str(), config.mqtt_port,
+                  config.mqtt_username.c_str());
+#endif
+
+    if (client.connect(config.mqtt_client.c_str(), config.mqtt_username.c_str(),
+                       config.mqtt_password.c_str(),
+                       config.status_topic.c_str(), 0, true, "Disconnected")) {
+      timeClient.update();
+
+      client.subscribe(config.command_topic.c_str());
+      client.subscribe(config.query_topic.c_str());
+      client.subscribe(config.update_topic.c_str());
+
+    } else {
+#ifdef DEBUG
+      Serial.print(" failed: ");
+      Serial.println(client.state());
+#endif
+      delay(5000);
+    }
+  }
+
+  Serial.println(" Connected.");
+
+  this->_onReady();
 }
 
 // ==========================================================================
@@ -123,43 +163,6 @@ void MQTTController::publishInformationData() {
   client.publish(config.information_topic.c_str(), message, false);
 
   free(msg);
-}
-
-/**
- * Connect
- */
-void MQTTController::connect() {
-  IPAddress mqttip;
-  WiFi.hostByName(config.mqtt_server.c_str(), mqttip);
-
-  while (!client.connected()) {
-#ifdef DEBUG
-    Serial.printf("[mqtt] Attempting connection to %s:%i as \"%s\" ...",
-                  config.mqtt_server.c_str(), config.mqtt_port,
-                  config.mqtt_username.c_str());
-#endif
-
-    if (client.connect(config.mqtt_client.c_str(), config.mqtt_username.c_str(),
-                       config.mqtt_password.c_str(),
-                       config.status_topic.c_str(), 0, true, "Disconnected")) {
-      timeClient.update();
-
-      client.subscribe(config.command_topic.c_str());
-      client.subscribe(config.query_topic.c_str());
-      client.subscribe(config.update_topic.c_str());
-
-    } else {
-#ifdef DEBUG
-      Serial.print(" failed: ");
-      Serial.println(client.state());
-#endif
-      delay(5000);
-    }
-  }
-
-  Serial.println(" Connected.");
-
-  this->_onReady();
 }
 
 #endif  // IS_ESP32

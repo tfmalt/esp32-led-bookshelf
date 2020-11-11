@@ -10,8 +10,8 @@
 
 namespace Effects {
 
-enum Command { Null, None, Empty, Brightness, Color, FirmwareUpdate };
-enum Effect {
+typedef enum { Null, None, Empty, Brightness, Color, FirmwareUpdate } Command;
+typedef enum {
   Confetti,
   BPM,
   GlitterRainbow,
@@ -29,7 +29,7 @@ enum Effect {
   NullEffect,
   EmptyEffect,
   NoEffect
-};
+} Effect;
 
 typedef std::function<void()> EffectFunction;
 typedef std::function<void()> CmdFunction;

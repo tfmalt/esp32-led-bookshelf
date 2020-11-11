@@ -28,18 +28,16 @@ uint8_t LightState::Controller::initialize() {
   currentState = defaultState;
 #ifdef IS_ESP32
   if (!SPIFFS.begin()) {
-    Serial.println("ERROR: Could not mount spiffs");
+    Serial.println("[state] ERROR: Could not mount spiffs");
     delay(2000);
     ESP.restart();
   }
 
-#ifdef DEBUG
-  Serial.printf("  - Light State: Reading in '%s'\n", stateFile);
-#endif
   File file = SPIFFS.open(stateFile, "r");
   if (!file) return LIGHT_STATEFILE_NOT_FOUND;
+
 #ifdef DEBUG
-  Serial.println("    - Opened file ok.");
+  Serial.printf("[state] reading and parsing '%s' ok\n", stateFile);
 #endif
 
   StaticJsonDocument<512> state;
@@ -47,7 +45,8 @@ uint8_t LightState::Controller::initialize() {
 
   if (error) {
 #ifdef DEBUG
-    Serial.println("ERROR: deserializejson of light state failed with error:");
+    Serial.println(
+        "[state] ERROR: deserializejson of light state failed with error:");
     Serial.println(error.c_str());
 #endif
     return LIGHT_STATEFILE_JSON_FAILED;
