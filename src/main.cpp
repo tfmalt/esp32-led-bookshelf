@@ -23,39 +23,20 @@
 #include <LightState.hpp>
 
 #ifdef IS_ESP32
+// Over the air update is only available on esp.
 #include <LedshelfOTA.hpp>
 #endif  // IS_ESP32
 
 #include <EventDispatcher.hpp>
 #include <LedshelfConfig.hpp>
 
-// #include <MQTTController.hpp>
-// // #include <WiFiController.h>
-//
-// #ifdef IS_TEENSY
-// #include <SerialMQTT.hpp>
-// #endif
-
 FASTLED_USING_NAMESPACE
 
-EventDispatcher EventHub;
-
-// global objects
+// EventDispatcher EventHub;
 CRGBArray<LED_COUNT> leds;
-
 LedshelfConfig config;
 Effects::Controller effects;
 LightState::Controller lightState;
-
-// EventDispatcher hub;
-
-// #ifdef IS_ESP32
-// MQTTController mqttCtrl(VERSION, config, lightState, effects);
-// #endif
-//
-// #ifdef IS_TEENSY
-// SerialMQTT serialCtrl;
-// #endif
 
 uint16_t commandFrames = FPS;
 uint16_t commandFrameCount = 0;
@@ -65,8 +46,6 @@ uint8_t updateProgress = 0;
 // ========================================================================
 // FastLED Setup
 // ========================================================================
-// Function that does the actual fast led setup on start.
-// Run by arduino setup function.
 void setupFastLED() {
 #ifdef DEBUG
   Serial.println("[main] Setting up LED:");
@@ -114,7 +93,7 @@ void setup() {
   lightState.initialize();
 
   EventHub.setup();
-  EventHub.setEffects(&effects);
+  // EventHub.setEffects(&effects);
   EventHub.setLightState(&lightState);
   EventHub.onStateChange(
       [](LightState::LightState s) { effects.handleStateChange(s); });
@@ -135,8 +114,6 @@ void setup() {
 
   setupFastLED();
 
-  // FastLED.setBrightness(currentState.state ? currentState.brightness : 0);
-  // LightState::LightState &currentState = lightState.getCurrentState();
   effects.setup(leds, LED_COUNT, lightState.getCurrentState());
 }
 
@@ -172,10 +149,15 @@ void loop() {
   }
 #ifdef DEBUG
   EVERY_N_SECONDS(10) {
+#ifdef IS_ESP32
     Serial.printf("FPS: %i heap: %i, size: %i, cpu: %i\n", FastLED.getFPS(),
                   ESP.getFreeHeap(), ESP.getHeapSize(), ESP.getCpuFreqMHz());
-  }
 #endif
+#ifdef IS_TEENSY
+    Serial.printf("FPS: %i\n", FastLED.getFPS());
+#endif
+  }
+#endif  // DEBUG
 
   EVERY_N_MILLIS(timetowait) { FastLED.show(); }
 }

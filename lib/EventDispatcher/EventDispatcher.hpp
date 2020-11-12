@@ -2,10 +2,9 @@
 #define EVENTDISPATCHER_HPP
 
 #include <Arduino.h>
-// #include <ArduinoOTA.h>
 #include <FastLED.h>
 
-#include <Effects.hpp>
+// #include <Effects.hpp>
 #include <LedshelfConfig.hpp>
 #include <LightState.hpp>
 #include <map>
@@ -80,7 +79,7 @@ class EventDispatcher {
   EventDispatcher &onError();
   EventDispatcher &onDisconnect();
 
-  void setEffects(Effects::Controller *e) { effects = e; }
+  // void setEffects(Effects::Controller *e) { effects = e; }
   void setLightState(LightState::Controller *l) { lightState = l; }
 
   void publishInformation(const char *message) {
@@ -102,7 +101,7 @@ class EventDispatcher {
   }
 
   void loop() {
-    mqtt.checkConnection();
+    mqtt.loop();
 
     EVERY_N_SECONDS(60) {
       publishStatus();
@@ -115,7 +114,7 @@ class EventDispatcher {
   std::vector<StateChangeHandler> _stateHandlers;
   std::vector<FirmwareUpdateHandler> _updateHandlers;
   LedshelfConfig config;
-  Effects::Controller *effects;
+  // Effects::Controller *effects;
   LightState::Controller *lightState;
 
 #ifdef IS_ESP32
@@ -125,18 +124,18 @@ class EventDispatcher {
   SerialMQTT mqtt;
 #endif
 
-  bool isFirmwareUpdateActive() {
-    return (effects->currentCommandType == Effects::Command::FirmwareUpdate);
-  }
+  // bool isFirmwareUpdateActive() {
+  //   return (effects->currentCommandType == Effects::Command::FirmwareUpdate);
+  // }
 
   void handleMessage(std::string topic, std::string message) {
     Serial.printf("[hub] handle message: topic: %s\n", topic.c_str());
 
-    if (isFirmwareUpdateActive()) {
-      Serial.println("[hub]   Firmware update active. Ignoring command.");
-      publishInformation("Firmware update active. Ignoring command.");
-      return;
-    }
+    // if (isFirmwareUpdateActive()) {
+    //   Serial.println("[hub]   Firmware update active. Ignoring command.");
+    //   publishInformation("Firmware update active. Ignoring command.");
+    //   return;
+    // }
 
     if (handlers.find(topic) != handlers.end()) {
       handlers[topic](topic, message);

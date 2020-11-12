@@ -31,7 +31,7 @@ class MQTTController {
   MQTTController &onMessage(
       std::function<void(std::string, std::string)> callback);
 
-  void checkConnection();
+  void loop();
   bool publish(const char *topic, const char *message);
   bool publish(std::string topic, std::string message);
   // void publishInformation(const char *message);

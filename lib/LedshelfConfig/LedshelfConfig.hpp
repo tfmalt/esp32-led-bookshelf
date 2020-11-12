@@ -12,6 +12,7 @@
 
 class LedshelfConfig {
  public:
+#ifdef IS_ESP32
   std::string wifi_ssid = WIFI_SSID;
   std::string wifi_psk = WIFI_PSK;
   std::string wifi_hostname = WIFI_HOSTNAME;
@@ -19,10 +20,12 @@ class LedshelfConfig {
   std::string mqtt_server = MQTT_SERVER;
   uint16_t mqtt_port = MQTT_PORT;
 
-  std::string mqtt_username = MQTT_USER;
   std::string mqtt_password = MQTT_PASS;
-
   std::string mqtt_client = MQTT_CLIENT;
+#endif  // IS_ESP32
+
+  std::string mqtt_username = MQTT_USER;
+
   std::string mqtt_command_topic = MQTT_TOPIC_COMMAND;
   std::string mqtt_state_topic = MQTT_TOPIC_STATE;
   std::string mqtt_status_topic = MQTT_TOPIC_STATUS;

@@ -121,7 +121,7 @@ MQTTController &MQTTController::onError(
 // End of Event handler callbacks
 // ==========================================================================
 
-void MQTTController::checkConnection() {
+void MQTTController::loop() {
   if (WiFi.status() != WL_CONNECTED) {
     this->_onError("Restarting because WiFi not connected.");
     delay(1000);
@@ -152,6 +152,9 @@ bool MQTTController::publish(std::string topic, std::string message) {
  */
 void MQTTController::publishInformationData() {
   char *msg;
+
+  WiFiClient &wifi = wifiCtrl.getWiFiClient();
+
   asprintf(&msg,
            "{\"time\": \"%s\", \"hostname\": \"%s\", \"version\": \"%s\", "
            "\"uptime\": %lu, \"memory\": %d }",

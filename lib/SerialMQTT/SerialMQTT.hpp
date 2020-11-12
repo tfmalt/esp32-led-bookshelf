@@ -4,6 +4,12 @@
 
 #include <Arduino.h>
 
+#include <functional>
+
+typedef std::function<void(std::string, std::string)> CallbackOnMessage;
+typedef std::function<void()> CallbackOnReady;
+typedef std::function<void(std::string)> CallbackOnError;
+
 #define BAUD_RATE 962100
 
 class SerialMQTT {
@@ -21,7 +27,46 @@ class SerialMQTT {
     }
   }
 
+  void loop() { handle(); }
+
+  SerialMQTT &onMessage(CallbackOnMessage _c) {
+    _onMessage = _c;
+    return *this;
+  }
+
+  SerialMQTT &onReady(CallbackOnReady _c) {
+    _onReady = _c;
+    return *this;
+  }
+
+  SerialMQTT &onDisconnect(CallbackOnError _c) {
+    _onDisconnect = _c;
+    return *this;
+  }
+
+  SerialMQTT &onError(CallbackOnError _c) {
+    _onError = _c;
+    return *this;
+  }
+
+  bool publish(std::string topic, std::string message) {
+    std::string head = "TOPIC " + topic;
+    std::string body = "MESSAGE " + message;
+    Serial3.println(head.c_str());
+    Serial3.println(body.c_str());
+    Serial3.println();
+
+    return true;
+  }
+
+  void publishInformationData() { Serial.println("DATA"); }
+
  private:
+  CallbackOnMessage _onMessage;
+  CallbackOnReady _onReady;
+  CallbackOnError _onDisconnect;
+  CallbackOnError _onError;
+
   void readData() {
     char c;
     char end = '\n';
