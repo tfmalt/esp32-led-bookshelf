@@ -1,4 +1,4 @@
-#ifdef IS_ESP32
+#ifdef ESP32
 #include "WiFiController.hpp"
 // #include <WiFiClientSecure.h>
 #include <WiFi.h>
@@ -27,7 +27,9 @@ void WiFiController::connect() {
 };
 
 // WiFiClientSecure &WiFiController::getWiFiClient()
-WiFiClient &WiFiController::getWiFiClient() { return wifiClient; };
+WiFiClient& WiFiController::getWiFiClient() {
+  return wifiClient;
+};
 
 void WiFiController::testOutput() {
 #ifdef DEBUG
@@ -105,4 +107,4 @@ void WiFiController::handleEvent(WiFiEvent_t event) {
   }
 }
 
-#endif  // IS_ESP32
+#endif  // ESP32

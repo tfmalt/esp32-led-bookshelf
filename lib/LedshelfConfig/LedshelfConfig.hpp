@@ -12,7 +12,7 @@
 
 class LedshelfConfig {
  public:
-#ifdef IS_ESP32
+#ifdef ESP32
   std::string wifi_ssid = WIFI_SSID;
   std::string wifi_psk = WIFI_PSK;
   std::string wifi_hostname = WIFI_HOSTNAME;
@@ -22,7 +22,7 @@ class LedshelfConfig {
 
   std::string mqtt_password = MQTT_PASS;
   std::string mqtt_client = MQTT_CLIENT;
-#endif  // IS_ESP32
+#endif  // ESP32
 
   std::string mqtt_username = MQTT_USER;
 
@@ -51,25 +51,25 @@ class LedshelfConfig {
 
   void setup() {}
 
-  std::string &stateTopic() { return state_topic; }
-  void stateTopic(char *topic) { strcpy(topic, state_topic.c_str()); }
+  std::string& stateTopic() { return state_topic; }
+  void stateTopic(char* topic) { strcpy(topic, state_topic.c_str()); }
 
-  std::string &commandTopic() { return command_topic; }
-  void commandTopic(char *topic) { strcpy(topic, command_topic.c_str()); }
+  std::string& commandTopic() { return command_topic; }
+  void commandTopic(char* topic) { strcpy(topic, command_topic.c_str()); }
 
-  std::string &statusTopic() { return status_topic; }
-  void statusTopic(char *topic) { strcpy(topic, status_topic.c_str()); }
+  std::string& statusTopic() { return status_topic; }
+  void statusTopic(char* topic) { strcpy(topic, status_topic.c_str()); }
 
-  std::string &queryTopic() { return query_topic; }
-  void queryTopic(char *topic) { strcpy(topic, query_topic.c_str()); }
+  std::string& queryTopic() { return query_topic; }
+  void queryTopic(char* topic) { strcpy(topic, query_topic.c_str()); }
 
-  std::string &informationTopic() { return information_topic; }
-  void informationTopic(char *topic) {
+  std::string& informationTopic() { return information_topic; }
+  void informationTopic(char* topic) {
     strcpy(topic, information_topic.c_str());
   }
 
-  std::string &updateTopic() { return update_topic; };
-  void updateTopic(char *topic) { strcpy(topic, update_topic.c_str()); }
+  std::string& updateTopic() { return update_topic; };
+  void updateTopic(char* topic) { strcpy(topic, update_topic.c_str()); }
 };
 
 #endif  // LEDSHELFCONFIG_H

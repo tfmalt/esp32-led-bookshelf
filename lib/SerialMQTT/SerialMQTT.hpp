@@ -1,65 +1,39 @@
 #ifndef SERIALMQTT_H
 #define SERIALMQTT_H
-#ifdef IS_TEENSY
+#ifdef TEENSY
 
 #include <Arduino.h>
-
 #include <functional>
+#include <string>
 
 typedef std::function<void(std::string, std::string)> CallbackOnMessage;
 typedef std::function<void()> CallbackOnReady;
+typedef std::function<void(std::string)> CallbackOnDisconnect;
 typedef std::function<void(std::string)> CallbackOnError;
 
-#define BAUD_RATE 962100
+struct MQTTMessage {
+  std::string topic;
+  std::string message;
+};
+
+// extern bool VERBOSE = false;
 
 class SerialMQTT {
  public:
-  SerialMQTT() {}
+  SerialMQTT();
 
-  void setup() {
-    // Setting up serial connection
-    Serial3.begin(BAUD_RATE, SERIAL_8N1);
-  }
+  void setup();
+  void loop();
 
-  void handle() {
-    if (Serial3.available() > 0) {
-      readData();
-    }
-  }
+  SerialMQTT& onMessage(CallbackOnMessage _c);
+  SerialMQTT& onReady(CallbackOnReady _c);
+  SerialMQTT& onDisconnect(CallbackOnError _c);
+  SerialMQTT& onError(CallbackOnError _c);
 
-  void loop() { handle(); }
+  SerialMQTT& enableVerboseOutput(bool v = true);
 
-  SerialMQTT &onMessage(CallbackOnMessage _c) {
-    _onMessage = _c;
-    return *this;
-  }
-
-  SerialMQTT &onReady(CallbackOnReady _c) {
-    _onReady = _c;
-    return *this;
-  }
-
-  SerialMQTT &onDisconnect(CallbackOnError _c) {
-    _onDisconnect = _c;
-    return *this;
-  }
-
-  SerialMQTT &onError(CallbackOnError _c) {
-    _onError = _c;
-    return *this;
-  }
-
-  bool publish(std::string topic, std::string message) {
-    std::string head = "TOPIC " + topic;
-    std::string body = "MESSAGE " + message;
-    Serial3.println(head.c_str());
-    Serial3.println(body.c_str());
-    Serial3.println();
-
-    return true;
-  }
-
-  void publishInformationData() { Serial.println("DATA"); }
+  bool publish(std::string topic, std::string message);
+  void publishInformationData();
 
  private:
   CallbackOnMessage _onMessage;
@@ -67,15 +41,8 @@ class SerialMQTT {
   CallbackOnError _onDisconnect;
   CallbackOnError _onError;
 
-  void readData() {
-    char c;
-    char end = '\n';
-
-    while (Serial3.available() > 0) {
-      c = Serial3.read();
-    }
-  }
+  bool VERBOSE = false;
 };
 
-#endif  // IS_TEENSY
+#endif  // TEENSY
 #endif  // SERIALMQTT_H

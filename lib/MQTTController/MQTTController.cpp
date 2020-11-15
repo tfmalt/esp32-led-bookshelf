@@ -1,5 +1,4 @@
 
-#ifdef IS_ESP32
 #include "MQTTController.hpp"
 
 #include <FastLED.h>
@@ -12,10 +11,16 @@
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", 3600, 60000);
 
+MQTTController::MQTTController(const char* _wifi_ssid,
+                               const char* _wifi_psk,
+                               const char* _wifi_hostname,
+                               const char* _mqtt_server,
+                               const char* _mqtt_port,
+                               const char* _mqtt_client) {}
 /**
  * Setup this instance of controller
  */
-MQTTController &MQTTController::setup() {
+MQTTController& MQTTController::setup() {
 #ifdef DEBUG
   Serial.printf("[mqtt] Setting up client: %s:%i\n", config.mqtt_server.c_str(),
                 config.mqtt_port);
@@ -26,7 +31,7 @@ MQTTController &MQTTController::setup() {
 
   timeClient.begin();
 
-  WiFiClient &wifi = wifiCtrl.getWiFiClient();
+  WiFiClient& wifi = wifiCtrl.getWiFiClient();
 #ifdef DEBUG
   Serial.println("[mqtt] Got wifi client");
 #endif
@@ -43,13 +48,13 @@ MQTTController &MQTTController::setup() {
 
   client.setClient(wifi);
   client.setServer(config.mqtt_server.c_str(), config.mqtt_port);
-  client.setCallback([this](char *p_topic, byte *p_message,
-                            unsigned int p_length) {
-    std::string topic = p_topic;
-    std::string message(reinterpret_cast<const char *>(p_message), p_length);
+  client.setCallback(
+      [this](char* p_topic, byte* p_message, unsigned int p_length) {
+        std::string topic = p_topic;
+        std::string message(reinterpret_cast<const char*>(p_message), p_length);
 
-    _onMessage(topic, message);
-  });
+        _onMessage(topic, message);
+      });
 
   Serial.println("[mqtt] Setup Finished.");
   return *this;
@@ -59,9 +64,6 @@ MQTTController &MQTTController::setup() {
  * Connect
  */
 void MQTTController::connect() {
-  IPAddress mqttip;
-  WiFi.hostByName(config.mqtt_server.c_str(), mqttip);
-
   while (!client.connected()) {
 #ifdef DEBUG
     Serial.printf("[mqtt] Attempting connection to %s:%i as \"%s\" ...",
@@ -95,24 +97,24 @@ void MQTTController::connect() {
 // ==========================================================================
 // Event handler callbacks
 // ==========================================================================
-MQTTController &MQTTController::onMessage(
+MQTTController& MQTTController::onMessage(
     std::function<void(std::string, std::string)> callback) {
   this->_onMessage = callback;
   return *this;
 }
 
-MQTTController &MQTTController::onReady(std::function<void()> callback) {
+MQTTController& MQTTController::onReady(std::function<void()> callback) {
   this->_onReady = callback;
   return *this;
 }
 
-MQTTController &MQTTController::onDisconnect(
+MQTTController& MQTTController::onDisconnect(
     std::function<void(std::string msg)> callback) {
   this->_onDisconnect = callback;
   return *this;
 }
 
-MQTTController &MQTTController::onError(
+MQTTController& MQTTController::onError(
     std::function<void(std::string error)> callback) {
   this->_onError = callback;
   return *this;
@@ -137,7 +139,7 @@ void MQTTController::loop() {
   client.loop();
 }
 
-bool MQTTController::publish(const char *topic, const char *message) {
+bool MQTTController::publish(const char* topic, const char* message) {
   // TODO: Add assertion that topic is corret.
   return client.publish(topic, message, false);
 }
@@ -151,9 +153,9 @@ bool MQTTController::publish(std::string topic, std::string message) {
  * compile some useful metainformation about the system
  */
 void MQTTController::publishInformationData() {
-  char *msg;
+  char* msg;
 
-  WiFiClient &wifi = wifiCtrl.getWiFiClient();
+  WiFiClient& wifi = wifiCtrl.getWiFiClient();
 
   asprintf(&msg,
            "{\"time\": \"%s\", \"hostname\": \"%s\", \"version\": \"%s\", "
@@ -162,10 +164,8 @@ void MQTTController::publishInformationData() {
            timeClient.getFormattedTime().c_str(), WiFi.getHostname(), version,
            millis(), xPortGetFreeHeapSize());
 
-  const char *message = msg;
+  const char* message = msg;
   client.publish(config.information_topic.c_str(), message, false);
 
   free(msg);
 }
-
-#endif  // IS_ESP32

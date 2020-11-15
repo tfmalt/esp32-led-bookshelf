@@ -11,11 +11,11 @@
 #include <string>
 #include <vector>
 
-#ifdef IS_ESP32
+#ifdef ESP32
 #include <MQTTController.hpp>
-#endif  // IS_ESP32
+#endif
 
-#ifdef IS_TEENSY
+#ifdef TEENSY
 #include <SerialMQTT.hpp>
 #endif
 
@@ -58,6 +58,9 @@ class EventDispatcher {
   ~EventDispatcher(){};
 
   void setup() {
+    if (VERBOSE) {
+      mqtt.enableVerboseOutput();
+    }
     mqtt.setup();
     mqtt.onMessage(
         [this](std::string t, std::string m) { this->handleMessage(t, m); });
@@ -66,23 +69,27 @@ class EventDispatcher {
     mqtt.onError([this](std::string err) { this->handleError(err); });
   }
 
-  EventDispatcher &onStateChange(StateChangeHandler callback) {
+  EventDispatcher& onStateChange(StateChangeHandler callback) {
     _stateHandlers.push_back(callback);
     return *this;
   };
-  EventDispatcher &onFirmwareUpdate(FirmwareUpdateHandler callback) {
+  EventDispatcher& onFirmwareUpdate(FirmwareUpdateHandler callback) {
     _updateHandlers.push_back(callback);
     return *this;
   };
 
-  EventDispatcher &onQuery();
-  EventDispatcher &onError();
-  EventDispatcher &onDisconnect();
+  EventDispatcher& onQuery();
+  EventDispatcher& onError();
+  EventDispatcher& onDisconnect();
 
-  // void setEffects(Effects::Controller *e) { effects = e; }
-  void setLightState(LightState::Controller *l) { lightState = l; }
+  EventDispatcher& enableVerboseOutput(bool v = true) {
+    VERBOSE = v;
+    return *this;
+  }
 
-  void publishInformation(const char *message) {
+  void setLightState(LightState::Controller* l) { lightState = l; }
+
+  void publishInformation(const char* message) {
     mqtt.publish(config.information_topic, message);
   };
 
@@ -101,7 +108,7 @@ class EventDispatcher {
   }
 
   void loop() {
-    mqtt.loop();
+    // mqtt.loop();
 
     EVERY_N_SECONDS(60) {
       publishStatus();
@@ -115,12 +122,14 @@ class EventDispatcher {
   std::vector<FirmwareUpdateHandler> _updateHandlers;
   LedshelfConfig config;
   // Effects::Controller *effects;
-  LightState::Controller *lightState;
+  LightState::Controller* lightState;
 
-#ifdef IS_ESP32
+  bool VERBOSE = false;
+
+#ifdef ESP32
   MQTTController mqtt;
 #endif
-#ifdef IS_TEENSY
+#ifdef TEENSY
   SerialMQTT mqtt;
 #endif
 
@@ -190,9 +199,6 @@ class EventDispatcher {
 
     publishInformation(
         "Got update notification. Getting ready to perform firmware update.");
-    //  #ifdef DEBUG
-    //      Serial.println("Running ArduinoOTA");
-    //  #endif
 
     for (auto f : _updateHandlers) {
       f();

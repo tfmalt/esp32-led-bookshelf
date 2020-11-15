@@ -6,7 +6,7 @@
 #define WiFiController_h
 
 #include <Arduino.h>
-#ifdef IS_ESP32
+#ifdef ESP32
 #include <WiFi.h>
 #endif
 // #include <WiFiClientSecure.h>
@@ -20,7 +20,7 @@ class WiFiController {
   void connect();
   void testOutput();
   // WiFiClientSecure &getWiFiClient();
-  WiFiClient &getWiFiClient();
+  WiFiClient& getWiFiClient();
 
  private:
   // WiFiClientSecure wifiClient;

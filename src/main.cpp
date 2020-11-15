@@ -22,10 +22,10 @@
 #include <Effects.hpp>
 #include <LightState.hpp>
 
-#ifdef IS_ESP32
+#ifdef ESP32
 // Over the air update is only available on esp.
 #include <LedshelfOTA.hpp>
-#endif  // IS_ESP32
+#endif  // ESP32
 
 #include <EventDispatcher.hpp>
 #include <LedshelfConfig.hpp>
@@ -84,10 +84,13 @@ void setupFastLED() {
  * ======================================================================
  */
 void setup() {
+  delay(10000);
 #ifdef DEBUG
   Serial.begin(115200);
   Serial.println();
   Serial.printf("[main] Starting version %s...\n", VERSION);
+
+  EventHub.enableVerboseOutput(true);
 #endif
 
   lightState.initialize();
@@ -98,7 +101,7 @@ void setup() {
   EventHub.onStateChange(
       [](LightState::LightState s) { effects.handleStateChange(s); });
 
-#ifdef IS_ESP32
+#ifdef ESP32
   LedshelfOTA::setup(leds);
   // setupArduinoOTA();
   EventHub.onFirmwareUpdate([]() {
@@ -108,7 +111,7 @@ void setup() {
     effects.setCurrentCommand(Effects::Command::FirmwareUpdate);
     effects.runCurrentCommand();
   });
-#endif  // IS_ESP32
+#endif  // ESP32
 
   delay(2000);
 
@@ -128,7 +131,7 @@ void loop() {
   EventHub.loop();
 
   if (effects.currentCommandType == Effects::Command::FirmwareUpdate) {
-#ifdef IS_ESP32
+#ifdef ESP32
     LedshelfOTA::handle();
     if (millis() > (effects.commandStart + 30000)) {
       EventHub.publishInformation("No update started for 180s. Rebooting.");
@@ -149,11 +152,11 @@ void loop() {
   }
 #ifdef DEBUG
   EVERY_N_SECONDS(10) {
-#ifdef IS_ESP32
+#ifdef ESP32
     Serial.printf("FPS: %i heap: %i, size: %i, cpu: %i\n", FastLED.getFPS(),
                   ESP.getFreeHeap(), ESP.getHeapSize(), ESP.getCpuFreqMHz());
 #endif
-#ifdef IS_TEENSY
+#ifdef TEENSY
     Serial.printf("FPS: %i\n", FastLED.getFPS());
 #endif
   }

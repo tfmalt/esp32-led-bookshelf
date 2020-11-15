@@ -7,7 +7,7 @@
 
 #include <ArduinoJson.h>
 
-#ifdef IS_ESP32
+#ifdef ESP32
 #include <FS.h>
 #include <SPIFFS.h>
 #endif
@@ -26,7 +26,7 @@ using namespace LightState;
 
 uint8_t LightState::Controller::initialize() {
   currentState = defaultState;
-#ifdef IS_ESP32
+#ifdef ESP32
   if (!SPIFFS.begin()) {
     Serial.println("[state] ERROR: Could not mount spiffs");
     delay(2000);
@@ -34,7 +34,8 @@ uint8_t LightState::Controller::initialize() {
   }
 
   File file = SPIFFS.open(stateFile, "r");
-  if (!file) return LIGHT_STATEFILE_NOT_FOUND;
+  if (!file)
+    return LIGHT_STATEFILE_NOT_FOUND;
 
 #ifdef DEBUG
   Serial.printf("[state] reading and parsing '%s' ok\n", stateFile);
@@ -65,11 +66,11 @@ uint8_t LightState::Controller::initialize() {
   currentState.color.s = (float)state["color"]["s"];
 
   file.close();
-#endif  // IS_ESP32
+#endif  // ESP32
   return 0;
 }
 
-LightState::LightState &LightState::Controller::parseNewState(
+LightState::LightState& LightState::Controller::parseNewState(
     std::string data) {
   LightState newState = getLightStateFromPayload(data);
   currentState = newState;
@@ -172,7 +173,7 @@ std::string LightState::Controller::getCurrentStateAsJSON() {
 /**
  * Serializes the current state into the output buffer
  */
-void LightState::Controller::serializeCurrentState(char *output, int length) {
+void LightState::Controller::serializeCurrentState(char* output, int length) {
   LightState state = getCurrentState();
   StaticJsonDocument<256> doc;
 
@@ -195,7 +196,7 @@ void LightState::Controller::serializeCurrentState(char *output, int length) {
  * Saves the current state to spiffs or eeprom
  */
 uint8_t LightState::Controller::saveCurrentState() {
-#ifdef IS_ESP32
+#ifdef ESP32
   char json[256];
   serializeCurrentState(json, 256);
 
@@ -208,7 +209,7 @@ uint8_t LightState::Controller::saveCurrentState() {
   return LIGHT_STATEFILE_WROTE_SUCCESS;
 }
 
-void LightState::Controller::printStateDebug(LightState &state) {
+void LightState::Controller::printStateDebug(LightState& state) {
 #ifdef DEBUG
   Serial.println("DEBUG: got new LightState:");
   Serial.printf("  - has state: %s, value: %s\n",
@@ -235,6 +236,6 @@ void LightState::Controller::printStateDebug(LightState &state) {
 /**
  * Returns current state
  */
-LightState::LightState &LightState::Controller::getCurrentState() {
+LightState::LightState& LightState::Controller::getCurrentState() {
   return currentState;
 }

@@ -1,12 +1,12 @@
 
 #include "Effects.hpp"
 
-#if defined(FFT_ACTIVE) && defined(IS_TEENSY)
+#if defined(FFT_ACTIVE) && defined(TEENSY)
 #include <AudioFFT.h>
 AudioFFT fft;
 #endif
 
-#if defined(FFT_ACTIVE) && defined(IS_ESP32)
+#if defined(FFT_ACTIVE) && defined(ESP32)
 #include <Esp32FFT.h>
 Esp32FFT fft;
 #endif
@@ -39,7 +39,8 @@ DEFINE_GRADIENT_PALETTE(gr65_hult_gp){0,   247, 176, 247, 48,  255, 136, 255,
 
 using namespace Effects;
 
-void Effects::Controller::setup(CRGB* l, const uint16_t n,
+void Effects::Controller::setup(CRGB* l,
+                                const uint16_t n,
                                 LightState::LightState s) {
 #ifdef DEBUG
   Serial.println("[effects] running setup.");
@@ -49,7 +50,7 @@ void Effects::Controller::setup(CRGB* l, const uint16_t n,
   leds = l;
   state = s;
 
-#if defined(FFT_ACTIVE) && defined(IS_ESP32)
+#if defined(FFT_ACTIVE) && defined(ESP32)
   fft.setup();
 #endif
 
@@ -139,21 +140,27 @@ void Effects::Controller::handleStateChange(LightState::LightState s) {
     } else {
       red = temp - 60;
       red = 329.698727446 * (pow(red, -0.1332047592));
-      if (red < 0) red = 0;
-      if (red > 255) red = 255;
+      if (red < 0)
+        red = 0;
+      if (red > 255)
+        red = 255;
     }
 
     double green = 0;
     if (temp <= 66) {
       green = temp;
       green = 99.4708025861 * log(green) - 161.1195681661;
-      if (green < 0) green = 0;
-      if (green > 255) green = 255;
+      if (green < 0)
+        green = 0;
+      if (green > 255)
+        green = 255;
     } else {
       green = temp - 60;
       green = 288.1221695283 * (pow(green, -0.0755148492));
-      if (green < 0) green = 0;
-      if (green > 255) green = 255;
+      if (green < 0)
+        green = 0;
+      if (green > 255)
+        green = 255;
     }
 
     double blue = 0;
@@ -165,8 +172,10 @@ void Effects::Controller::handleStateChange(LightState::LightState s) {
       } else {
         blue = temp - 10;
         blue = 138.5177312231 * log(blue) - 305.0447927307;
-        if (blue < 0) blue = 0;
-        if (blue > 255) blue = 255;
+        if (blue < 0)
+          blue = 0;
+        if (blue > 255)
+          blue = 255;
       }
     }
 
@@ -194,7 +203,9 @@ void Effects::Controller::handleStateChange(LightState::LightState s) {
 //   lightState = l;
 // }
 
-void Effects::Controller::setCommandFrames(uint16_t i) { commandFrames = i; }
+void Effects::Controller::setCommandFrames(uint16_t i) {
+  commandFrames = i;
+}
 
 void Effects::Controller::setCurrentCommand(Command cmd) {
   // LightState::LightState& state = lightState->getCurrentState();
@@ -221,20 +232,34 @@ void Effects::Controller::setCurrentCommand(Command cmd) {
 }
 
 Effects::Effect Effects::Controller::getEffectFromString(std::string str) {
-  if (str == "Glitter Rainbow") return Effect::GlitterRainbow;
-  if (str == "Rainbow") return Effect::Rainbow;
-  if (str == "Gradient") return Effect::Gradient;
-  if (str == "RainbowByShelf") return Effect::RainbowByShelf;
-  if (str == "BPM") return Effect::BPM;
-  if (str == "Confetti") return Effect::Confetti;
-  if (str == "Juggle") return Effect::Juggle;
-  if (str == "Sinelon") return Effect::Sinelon;
-  if (str == "VUMeter") return Effect::VUMeter;
-  if (str == "Frequencies") return Effect::Frequencies;
-  if (str == "Music Dancer") return Effect::MusicDancer;
-  if (str == "Pride") return Effect::Pride;
-  if (str == "Colorloop") return Effect::Colorloop;
-  if (str == "Walking Rainbow") return Effect::WalkingRainbow;
+  if (str == "Glitter Rainbow")
+    return Effect::GlitterRainbow;
+  if (str == "Rainbow")
+    return Effect::Rainbow;
+  if (str == "Gradient")
+    return Effect::Gradient;
+  if (str == "RainbowByShelf")
+    return Effect::RainbowByShelf;
+  if (str == "BPM")
+    return Effect::BPM;
+  if (str == "Confetti")
+    return Effect::Confetti;
+  if (str == "Juggle")
+    return Effect::Juggle;
+  if (str == "Sinelon")
+    return Effect::Sinelon;
+  if (str == "VUMeter")
+    return Effect::VUMeter;
+  if (str == "Frequencies")
+    return Effect::Frequencies;
+  if (str == "Music Dancer")
+    return Effect::MusicDancer;
+  if (str == "Pride")
+    return Effect::Pride;
+  if (str == "Colorloop")
+    return Effect::Colorloop;
+  if (str == "Walking Rainbow")
+    return Effect::WalkingRainbow;
 
   return Effect::NullEffect;
 }
@@ -307,7 +332,9 @@ void Effects::Controller::runCurrentCommand() {
   }
 }
 
-void Effects::Controller::runCurrentEffect() { this->currentEffect(); }
+void Effects::Controller::runCurrentEffect() {
+  this->currentEffect();
+}
 
 void Effects::Controller::cmdEmpty() {}
 
@@ -351,9 +378,11 @@ void Effects::Controller::cmdSetBrightness() {
  * Taken from:
  * https://gist.github.com/kriegsman/d0a5ed3c8f38c64adcb4837dafb6e690
  */
-void Effects::Controller::nblendU8TowardU8(uint8_t& cur, const uint8_t target,
+void Effects::Controller::nblendU8TowardU8(uint8_t& cur,
+                                           const uint8_t target,
                                            uint8_t amount) {
-  if (cur == target) return;
+  if (cur == target)
+    return;
 
   if (cur < target) {
     uint8_t delta = target - cur;
@@ -373,7 +402,8 @@ void Effects::Controller::nblendU8TowardU8(uint8_t& cur, const uint8_t target,
  * Taken from:
  * https://gist.github.com/kriegsman/d0a5ed3c8f38c64adcb4837dafb6e690
  */
-CRGB Effects::Controller::fadeTowardColor(CRGB& cur, const CRGB& target,
+CRGB Effects::Controller::fadeTowardColor(CRGB& cur,
+                                          const CRGB& target,
                                           uint8_t amount) {
   nblendU8TowardU8(cur.red, target.red, amount);
   nblendU8TowardU8(cur.green, target.green, amount);
@@ -386,14 +416,16 @@ CRGB Effects::Controller::fadeTowardColor(CRGB& cur, const CRGB& target,
  * amount This function modifies the pixel array in place. Taken from:
  * https://gist.github.com/kriegsman/d0a5ed3c8f38c64adcb4837dafb6e690
  */
-void Effects::Controller::fadeTowardColor(CRGB* L, uint16_t N,
+void Effects::Controller::fadeTowardColor(CRGB* L,
+                                          uint16_t N,
                                           const CRGB& bgColor,
                                           uint8_t fadeAmount) {
   uint16_t check = 0;
   EVERY_N_MILLIS(4) {
     for (uint16_t i = 0; i < N; i++) {
       fadeTowardColor(L[i], bgColor, fadeAmount);
-      if (L[i] == bgColor) check++;
+      if (L[i] == bgColor)
+        check++;
     }
   }
 
@@ -474,12 +506,14 @@ void Effects::Controller::effectRainbowByShelf() {
   ledset(0, 63).fill_rainbow(startHue, 4);
   ledset(64, 127) = ledset(63, 0);
 
-  if (numberOfLeds < 131) return;
+  if (numberOfLeds < 131)
+    return;
 
   ledset(128, 191).fill_rainbow(startHue + 64, 4);
   ledset(192, 255) = ledset(191, 128);
 
-  if (numberOfLeds < 257) return;
+  if (numberOfLeds < 257)
+    return;
 
   ledset(256, 319).fill_rainbow(startHue + 128, 4);
   ledset(320, 383) = ledset(319, 256);

@@ -21,7 +21,7 @@ uint8_t OTA_HUE = 64;
 // Arduino OTA Setup
 // ========================================================================
 void setup(CRGB* l) {
-#ifdef IS_ESP32
+#ifdef ESP32
 
   leds = l;
   ArduinoOTA.setPort(3232);
@@ -121,8 +121,10 @@ void start() {
   ArduinoOTA.begin();
 }
 
-void handle() { ArduinoOTA.handle(); }
+void handle() {
+  ArduinoOTA.handle();
+}
 
-#endif  // IS_ESP32
+#endif  // ESP32
 
 }  // namespace LedshelfOTA
