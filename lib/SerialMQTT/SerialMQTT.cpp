@@ -1,40 +1,32 @@
 #ifdef TEENSY
 #include "SerialMQTT.hpp"
 #include <Arduino.h>
-#include <I2CTransfer.h>
+// #include <FastLED.h>
+// #include <SerialTransfer.h>
 
-I2CTransfer rxtx;
-
-void handleMessage() {
-  MQTTMessage incoming;
-  rxtx.rxObj(incoming);
-  Serial.println("[mqtt] got i2c callback:");
-  Serial.printf("[mqtt] topic: %s, message: %s", incoming.topic.c_str(),
-                incoming.message.c_str());
-}
-
-functionPtr rxtxCallbacks[] = {handleMessage};
+#define RXTX_BAUD_RATE 57600
 
 SerialMQTT::SerialMQTT(){};
 
 void SerialMQTT::setup() {
-  // Setting up serial connection
   Serial.println("[mqtt] running setup for SerialMQTT");
-
-  Wire.begin(0);
-
-  configST conf;
-  conf.debug = true;
-  conf.callbacks = rxtxCallbacks;
-  conf.callbacksLen = sizeof(rxtxCallbacks) / sizeof(functionPtr);
-
-  Serial.printf("[mqtt] callbackslen: %i\n", conf.callbacksLen);
-
-  rxtx.begin(Wire, conf);
+  Serial3.begin(RXTX_BAUD_RATE, SERIAL_8N1);
+  rxtx.begin(Serial3);
 }
 
 void SerialMQTT::loop() {
-  // hello
+  // EVERY_N_SECONDS(2) { Serial.println("[mqtt] inside serial mqtt loop."); }
+  MQTTMessage msg;
+
+  if (rxtx.available()) {
+    rxtx.rxObj(msg);
+    Serial.printf("[mqtt] received topic: %s, message: %s\n", msg.topic,
+                  msg.message);
+
+    if (this->_onMessage != nullptr) {
+      this->_onMessage(std::string{msg.topic}, std::string{msg.message});
+    }
+  }
 }
 
 SerialMQTT& SerialMQTT::onMessage(CallbackOnMessage _c) {
@@ -58,11 +50,10 @@ SerialMQTT& SerialMQTT::onError(CallbackOnError _c) {
 }
 
 bool SerialMQTT::publish(std::string topic, std::string message) {
-  // std::string head = "TOPIC " + topic;
-  // std::string body = "MESSAGE " + message;
-  // Serial3.println(head.c_str());
-  // Serial3.println(body.c_str());
-  // Serial3.println();
+  MQTTMessage msg;
+  strcpy(msg.topic, topic.c_str());
+  strcpy(msg.message, message.c_str());
+  rxtx.sendDatum(msg);
 
   return true;
 }

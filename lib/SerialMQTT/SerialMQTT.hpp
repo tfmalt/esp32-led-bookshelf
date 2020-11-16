@@ -3,6 +3,7 @@
 #ifdef TEENSY
 
 #include <Arduino.h>
+#include <SerialTransfer.h>
 #include <functional>
 #include <string>
 
@@ -11,9 +12,11 @@ typedef std::function<void()> CallbackOnReady;
 typedef std::function<void(std::string)> CallbackOnDisconnect;
 typedef std::function<void(std::string)> CallbackOnError;
 
+enum MQTTMessageType { START_OK, MESSAGE };
 struct MQTTMessage {
-  std::string topic;
-  std::string message;
+  uint8_t type;
+  char topic[32];
+  char message[256];
 };
 
 // extern bool VERBOSE = false;
@@ -41,6 +44,7 @@ class SerialMQTT {
   CallbackOnError _onDisconnect;
   CallbackOnError _onError;
 
+  SerialTransfer rxtx;
   bool VERBOSE = false;
 };
 

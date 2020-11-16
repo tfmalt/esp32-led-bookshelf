@@ -108,12 +108,20 @@ class EventDispatcher {
   }
 
   void loop() {
-    // mqtt.loop();
+    mqtt.loop();
 
     EVERY_N_SECONDS(60) {
       publishStatus();
       publishInformation();  // todo: clean up this
     }
+  }
+
+  void handleReady() {
+    Serial.println("[hub] Everything is ready.");
+
+    mqtt.publish(config.status_topic, "Online");
+    mqtt.publishInformationData();
+    mqtt.publish(config.state_topic, this->lightState->getCurrentStateAsJSON());
   }
 
  private:
@@ -140,12 +148,6 @@ class EventDispatcher {
   void handleMessage(std::string topic, std::string message) {
     Serial.printf("[hub] handle message: topic: %s\n", topic.c_str());
 
-    // if (isFirmwareUpdateActive()) {
-    //   Serial.println("[hub]   Firmware update active. Ignoring command.");
-    //   publishInformation("Firmware update active. Ignoring command.");
-    //   return;
-    // }
-
     if (handlers.find(topic) != handlers.end()) {
       handlers[topic](topic, message);
     } else {
@@ -156,15 +158,6 @@ class EventDispatcher {
   // ========================================================================
   // Handlers for MQTT Controller events.
   // ========================================================================
-  void handleReady() {
-    // got ready handler
-    Serial.println("[hub] Got MQTT Ready");
-
-    mqtt.publish(config.status_topic, "Online");
-    mqtt.publishInformationData();
-    mqtt.publish(config.state_topic, this->lightState->getCurrentStateAsJSON());
-  }
-
   void handleDisconnect(std::string msg) {
     Serial.printf("[hub] Disconnect: %s\n", msg.c_str());
   }

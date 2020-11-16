@@ -118,6 +118,7 @@ void setup() {
   setupFastLED();
 
   effects.setup(leds, LED_COUNT, lightState.getCurrentState());
+  EventHub.handleReady();
 }
 
 /* ======================================================================
@@ -151,13 +152,14 @@ void loop() {
     effects.runCurrentEffect();
   }
 #ifdef DEBUG
-  EVERY_N_SECONDS(10) {
+  EVERY_N_SECONDS(60) {
 #ifdef ESP32
-    Serial.printf("FPS: %i heap: %i, size: %i, cpu: %i\n", FastLED.getFPS(),
-                  ESP.getFreeHeap(), ESP.getHeapSize(), ESP.getCpuFreqMHz());
+    Serial.printf("[main] FPS: %i heap: %i, size: %i, cpu: %i\n",
+                  FastLED.getFPS(), ESP.getFreeHeap(), ESP.getHeapSize(),
+                  ESP.getCpuFreqMHz());
 #endif
 #ifdef TEENSY
-    Serial.printf("FPS: %i\n", FastLED.getFPS());
+    Serial.printf("[main] FPS: %i\n", FastLED.getFPS());
 #endif
   }
 #endif  // DEBUG
