@@ -11,13 +11,6 @@ void SerialMQTT::setup() {
   Serial.println("[mqtt] running setup for SerialMQTT.");
   Serial3.begin(RXTX_BAUD_RATE, SERIAL_8N1);
   rxtx.begin(Serial3);
-
-  // while (!this->connected()) {
-  //   this->connect();
-  // }
-  //
-  //   Serial.println();
-  //   Serial.println("[mqtt] connected.");
 }
 
 SerialMQTT& SerialMQTT::connect() {
@@ -47,21 +40,18 @@ SerialMQTT& SerialMQTT::connect() {
 
 void SerialMQTT::loop() {
   // EVERY_N_SECONDS(2) { Serial.println("[mqtt] inside serial mqtt loop."); }
-  MQTTMessage msg;
 
   if (rxtx.available()) {
+    MQTTMessage msg;
+    // msg.count = 0;
     rxtx.rxObj(msg);
+    this->_lastHeartbeat = millis();
     switch (msg.type) {
       case MQTTMessageType::MESSAGE: {
         Serial.printf("[mqtt] received topic: %s, message: %s\n", msg.topic,
                       msg.message);
 
-        for (auto func : this->_onMessageList) {
-          if (func != nullptr) {
-            func(std::string{msg.topic}, std::string{msg.message});
-          }
-        }
-
+        this->emitMessage(std::string{msg.topic}, std::string{msg.message});
         break;
       }
 
@@ -71,8 +61,17 @@ void SerialMQTT::loop() {
       }
 
       case MQTTMessageType::STATUS_OK: {
-        this->_lastHeartbeat = millis();
-        this->_isConnected = true;
+        Serial.printf("[mqtt] <<< STATUS OK: count: %i\n", msg.count);
+        // this->_isConnected = true;
+        if (msg.count < 2) {
+          this->emitMissingSubscribe();
+        }
+        break;
+      }
+
+      case MQTTMessageType::STATUS_NO_SUB: {
+        Serial.printf("[mqtt] <<< NO SUBSCRIPTIONS: %i\n", msg.count);
+        this->emitMissingSubscribe();
         break;
       }
 
@@ -98,6 +97,10 @@ SerialMQTT& SerialMQTT::onReady(CallbackOnReady _c) {
   this->_onReadyList.push_back(_c);
   return *this;
 }
+SerialMQTT& SerialMQTT::onMissingSubscribe(CallbackOnReady _c) {
+  this->_onMissingSubscribeList.push_back(_c);
+  return *this;
+}
 
 SerialMQTT& SerialMQTT::onDisconnect(CallbackOnDisconnect _c) {
   this->_onDisconnectList.push_back(_c);
@@ -110,8 +113,46 @@ SerialMQTT& SerialMQTT::onError(CallbackOnError _c) {
 }
 
 // ==========================================================================
+// event emitters
+// ==========================================================================
+void SerialMQTT::emitMissingSubscribe() {
+  for (auto func : this->_onMissingSubscribeList) {
+    if (func != nullptr) {
+      func();
+    }
+  }
+}
+
+void SerialMQTT::emitReady() {
+  for (auto func : this->_onReadyList) {
+    if (func != nullptr) {
+      func();
+    }
+  }
+}
+
+void SerialMQTT::emitMessage(std::string topic, std::string msg) {
+  for (auto func : this->_onMessageList) {
+    if (func != nullptr) {
+      func(topic, msg);
+    }
+  }
+}
+
+// ==========================================================================
 // MQTT passthrough functions.
 // ==========================================================================
+SerialMQTT& SerialMQTT::subscribe(std::string topic) {
+  MQTTMessage msg;
+  msg.type = MQTTMessageType::SUBSCRIBE;
+  strcpy(msg.topic, topic.c_str());
+  strcpy(msg.message, "");
+
+  rxtx.sendDatum(msg);
+
+  return *this;
+}
+
 bool SerialMQTT::publish(std::string topic, std::string message) {
   MQTTMessage msg;
   msg.type = MQTTMessageType::MESSAGE;
@@ -161,11 +202,7 @@ void SerialMQTT::handleConnection() {
 
   Serial.println("[mqtt] ||| serial connected.");
 
-  for (auto func : this->_onReadyList) {
-    if (func != nullptr) {
-      func();
-    }
-  }
+  this->emitReady();
 }
 
 #endif

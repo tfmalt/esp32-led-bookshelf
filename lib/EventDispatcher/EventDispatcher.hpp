@@ -72,6 +72,7 @@ class EventDispatcher {
     mqtt.onMessage(
         [this](std::string t, std::string m) { this->handleMessage(t, m); });
     mqtt.onReady([this]() { this->handleReady(); });
+    mqtt.onMissingSubscribe([this]() { this->handleSubscribe(); });
     mqtt.onDisconnect([this](std::string msg) { this->handleDisconnect(msg); });
     mqtt.onError([this](std::string err) { this->handleError(err); });
   }
@@ -124,11 +125,19 @@ class EventDispatcher {
   }
 
   void handleReady() {
-    Serial.println("[hub] mqtt everything is ready.");
+    Serial.println(" [hub] ||| mqtt serial is ready.");
 
     mqtt.publish(config.status_topic, "Online");
     mqtt.publishInformationData();
     mqtt.publish(config.state_topic, this->lightState->getCurrentStateAsJSON());
+  }
+
+  void handleSubscribe() {
+    Serial.printf(" [hub] >>> subscribe: %s\n", config.command_topic.c_str());
+    mqtt.subscribe(config.command_topic);
+    delay(1000);  // wait a second between each subscribe.
+    Serial.printf(" [hub] >>> subscribe: %s\n", config.query_topic.c_str());
+    mqtt.subscribe(config.query_topic);
   }
 
  private:
