@@ -4,15 +4,19 @@
 
 #include <Arduino.h>
 #include <SerialTransfer.h>
+#include <algorithm>
 #include <functional>
 #include <string>
+#include <vector>
 
 typedef std::function<void(std::string, std::string)> CallbackOnMessage;
 typedef std::function<void()> CallbackOnReady;
 typedef std::function<void(std::string)> CallbackOnDisconnect;
 typedef std::function<void(std::string)> CallbackOnError;
 
-enum MQTTMessageType { START_OK, MESSAGE };
+constexpr uint32_t HEARTBEAT_MAX_AGE = 22000;
+
+enum MQTTMessageType { CONNECT, CONNECT_ACK, STATUS_OK, MESSAGE };
 struct MQTTMessage {
   uint8_t type;
   char topic[32];
@@ -27,7 +31,10 @@ class SerialMQTT {
 
   void setup();
   void loop();
+  bool connected();
+  uint32_t getHeartbeatAge();
 
+  SerialMQTT& connect();
   SerialMQTT& onMessage(CallbackOnMessage _c);
   SerialMQTT& onReady(CallbackOnReady _c);
   SerialMQTT& onDisconnect(CallbackOnError _c);
@@ -39,13 +46,18 @@ class SerialMQTT {
   void publishInformationData();
 
  private:
-  CallbackOnMessage _onMessage;
-  CallbackOnReady _onReady;
-  CallbackOnError _onDisconnect;
-  CallbackOnError _onError;
+  std::vector<CallbackOnReady> _onReadyList;
+  std::vector<CallbackOnMessage> _onMessageList;
+  std::vector<CallbackOnDisconnect> _onDisconnectList;
+  std::vector<CallbackOnError> _onErrorList;
 
   SerialTransfer rxtx;
   bool VERBOSE = false;
+  bool _isConnected = false;
+  uint32_t _lastHeartbeat = millis();
+
+  void checkConnection();
+  void handleConnection();
 };
 
 #endif  // TEENSY

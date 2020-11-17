@@ -84,7 +84,7 @@ void setupFastLED() {
  * ======================================================================
  */
 void setup() {
-  delay(10000);
+  delay(5000);
 #ifdef DEBUG
   Serial.begin(115200);
   Serial.println();
@@ -118,7 +118,7 @@ void setup() {
   setupFastLED();
 
   effects.setup(leds, LED_COUNT, lightState.getCurrentState());
-  EventHub.handleReady();
+  // EventHub.handleReady();
 }
 
 /* ======================================================================
@@ -159,7 +159,8 @@ void loop() {
                   ESP.getCpuFreqMHz());
 #endif
 #ifdef TEENSY
-    Serial.printf("[main] FPS: %i\n", FastLED.getFPS());
+    Serial.printf("[main] FPS: %i, heartbeat age: %lu\n", FastLED.getFPS(),
+                  EventHub.mqtt.getHeartbeatAge());
 #endif
   }
 #endif  // DEBUG

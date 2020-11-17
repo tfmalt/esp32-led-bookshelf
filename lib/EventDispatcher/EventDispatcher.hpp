@@ -28,6 +28,13 @@ typedef std::function<void()> FirmwareUpdateHandler;
 
 class EventDispatcher {
  public:
+#ifdef ESP32
+  MQTTController mqtt;
+#endif
+#ifdef TEENSY
+  SerialMQTT mqtt;
+#endif
+
   EventDispatcher() {
     handlers[config.state_topic] = [this](std::string topic,
                                           std::string message) {
@@ -117,7 +124,7 @@ class EventDispatcher {
   }
 
   void handleReady() {
-    Serial.println("[hub] Everything is ready.");
+    Serial.println("[hub] mqtt everything is ready.");
 
     mqtt.publish(config.status_topic, "Online");
     mqtt.publishInformationData();
@@ -133,13 +140,6 @@ class EventDispatcher {
   LightState::Controller* lightState;
 
   bool VERBOSE = false;
-
-#ifdef ESP32
-  MQTTController mqtt;
-#endif
-#ifdef TEENSY
-  SerialMQTT mqtt;
-#endif
 
   // bool isFirmwareUpdateActive() {
   //   return (effects->currentCommandType == Effects::Command::FirmwareUpdate);
@@ -159,7 +159,7 @@ class EventDispatcher {
   // Handlers for MQTT Controller events.
   // ========================================================================
   void handleDisconnect(std::string msg) {
-    Serial.printf("[hub] Disconnect: %s\n", msg.c_str());
+    Serial.printf("[hub] disconnect from mqtt: %s\n", msg.c_str());
   }
 
   void handleError(std::string error) {

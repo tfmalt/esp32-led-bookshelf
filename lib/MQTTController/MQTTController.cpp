@@ -1,7 +1,6 @@
 
 #include "MQTTController.hpp"
 
-#include <FastLED.h>
 #include <NTPClient.h>
 #include <WiFiUdp.h>
 
