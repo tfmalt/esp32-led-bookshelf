@@ -16,17 +16,8 @@ void SerialMQTT::setup() {
 SerialMQTT& SerialMQTT::connect() {
   MQTTMessage msg;
 
-  // if (rxtx.available()) {
-  //   rxtx.rxObj(msg);
-  //
-  //     if (msg.type == MQTTMessageType::CONNECT_ACK) {
-  //       this->_isConnected = true;
-  //       return *this;
-  //     }
-  //   }
-
   if (millis() - start_time > 1000) {
-    Serial.printf("[mqtt] ||| serial disconnected: %lu\n", start_time);
+    Serial.printf("[mqtt] ||| serial disconnected: %lu\n", getHeartbeatAge());
     msg.type = MQTTMessageType::CONNECT;
     strcpy(msg.topic, "CONNECT");
     strcpy(msg.message, "");
@@ -39,8 +30,6 @@ SerialMQTT& SerialMQTT::connect() {
 }
 
 void SerialMQTT::loop() {
-  // EVERY_N_SECONDS(2) { Serial.println("[mqtt] inside serial mqtt loop."); }
-
   if (rxtx.available()) {
     MQTTMessage msg;
     // msg.count = 0;
