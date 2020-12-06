@@ -25,16 +25,17 @@
 #ifdef ESP32
 // Over the air update is only available on esp.
 #include <LedshelfOTA.hpp>
-#endif  // ESP32
-#ifdef TEENSY
+#elif TEENSY
 #include <TeensyUtil.hpp>
 #endif
+
+#include <Credentials.h>
+#include <LedshelfConfig.h>
 #include <EventDispatcher.hpp>
-#include <LedshelfConfig.hpp>
 
 FASTLED_USING_NAMESPACE
 
-// EventDispatcher EventHub;
+EventDispatcher eventhub;
 CRGBArray<LED_COUNT> leds;
 LedshelfConfig config;
 Effects::Controller effects;
@@ -86,27 +87,26 @@ void setupFastLED() {
  * ======================================================================
  */
 void setup() {
-  delay(5000);
+#if defined(TEENSY) && defined(DEBUG)
+  delay(2000);
+#endif
 #ifdef DEBUG
   Serial.begin(115200);
   Serial.println();
   Serial.printf("[main] Starting version %s...\n", VERSION);
 
-  EventHub.enableVerboseOutput(true);
+  eventhub.enableVerboseOutput();
 #endif
 
-  lightState.initialize();
-
-  EventHub.setup();
-  // EventHub.setEffects(&effects);
-  EventHub.setLightState(&lightState);
-  EventHub.onStateChange(
+  eventhub.begin();
+  eventhub.setLightState(lightState);
+  eventhub.onStateChange(
       [](LightState::LightState s) { effects.handleStateChange(s); });
 
 #ifdef ESP32
   LedshelfOTA::setup(leds);
   // setupArduinoOTA();
-  EventHub.onFirmwareUpdate([]() {
+  eventhub.onFirmwareUpdate([]() {
     LedshelfOTA::start();
 
     effects.setCurrentEffect(Effects::Effect::NullEffect);
@@ -115,12 +115,13 @@ void setup() {
   });
 #endif  // ESP32
 
+  lightState.initialize();
+
   delay(2000);
 
   setupFastLED();
 
   effects.setup(leds, LED_COUNT, lightState.getCurrentState());
-  // EventHub.handleReady();
 }
 
 /* ======================================================================
@@ -131,10 +132,10 @@ unsigned long timetowait = 1000 / FPS;
 unsigned long previoustime = 0;
 
 void loop() {
-  EventHub.loop();
+  eventhub.loop();
 
 #ifdef TEENSY
-  if (EventHub.mqtt.getHeartbeatAge() > 300000) {
+  if (eventhub.mqtt.getHeartbeatAge() > 300000) {
     // reboot if heartbeat is older than 300s = 5min.
     Serial.println("[main] !!! heartbeat is older than 5 minutes. reboot.");
     Util::restart();
@@ -145,7 +146,7 @@ void loop() {
 #ifdef ESP32
     LedshelfOTA::handle();
     if (millis() > (effects.commandStart + 30000)) {
-      EventHub.publishInformation("No update started for 180s. Rebooting.");
+      eventhub.publishInformation("No update started for 180s. Rebooting.");
       delay(1000);
       ESP.restart();
     }
@@ -171,7 +172,7 @@ void loop() {
 #ifdef TEENSY
     Serial.printf("[main] ||| fps: %i, uptime: %lus, heartbeat age: %lu\n",
                   FastLED.getFPS(), (uint32_t)(millis() / 1000),
-                  EventHub.mqtt.getHeartbeatAge());
+                  eventhub.mqtt.getHeartbeatAge());
 
 #endif
   }

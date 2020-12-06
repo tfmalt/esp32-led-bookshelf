@@ -1,3 +1,3 @@
 #include "EventDispatcher.hpp"
 
-EventDispatcher EventHub;
+// EventDispatcher EventHub;

@@ -5,8 +5,9 @@
 #include <FastLED.h>
 
 // #include <Effects.hpp>
-#include <LedshelfConfig.hpp>
+#include <LedshelfConfig.h>
 #include <LightState.hpp>
+#include <functional>
 #include <map>
 #include <string>
 #include <vector>
@@ -16,7 +17,7 @@
 #endif
 
 #ifdef TEENSY
-#include <SerialMQTT.hpp>
+#include <AtMQTT.h>
 #endif
 
 // Typedef for the lookup map for the mqtt event handlers
@@ -32,7 +33,8 @@ class EventDispatcher {
   MQTTController mqtt;
 #endif
 #ifdef TEENSY
-  SerialMQTT mqtt;
+  // SerialMQTTTransfer mqtt;
+  AtMQTT mqtt;
 #endif
 
   EventDispatcher() {
@@ -64,15 +66,25 @@ class EventDispatcher {
 
   ~EventDispatcher(){};
 
-  void setup() {
+  void begin() {
     if (VERBOSE) {
       mqtt.enableVerboseOutput();
     }
-    mqtt.setup();
+
+#ifdef TEENSY
+    Serial3.begin(115200);
+    // mqtt.begin(Serial3, config.wifi_ssid.c_str(), config.wifi_psk.c_str());
+    mqtt.begin(Serial3, config.wifi_ssid.c_str(), config.wifi_psk.c_str(),
+               config.mqtt_server.c_str(), config.mqtt_port,
+               config.mqtt_username.c_str(), config.mqtt_password.c_str(),
+               config.mqtt_client.c_str());
+#else
+    mqtt.begin();
+#endif
     mqtt.onMessage(
         [this](std::string t, std::string m) { this->handleMessage(t, m); });
     mqtt.onReady([this]() { this->handleReady(); });
-    mqtt.onMissingSubscribe([this]() { this->handleSubscribe(); });
+    // mqtt.onMissingSubscribe([this]() { this->handleSubscribe(); });
     mqtt.onDisconnect([this](std::string msg) { this->handleDisconnect(msg); });
     mqtt.onError([this](std::string err) { this->handleError(err); });
   }
@@ -95,7 +107,7 @@ class EventDispatcher {
     return *this;
   }
 
-  void setLightState(LightState::Controller* l) { lightState = l; }
+  void setLightState(LightState::Controller& l) { lightState = &l; }
 
   void publishInformation(const char* message) {
     mqtt.publish(config.information_topic, message);
@@ -107,7 +119,7 @@ class EventDispatcher {
 
   void publishInformation() {
     // to replace informationdata
-    mqtt.publishInformationData();
+    // mqtt.publishInformationData();
   }
 
   void publishStatus() {
@@ -128,7 +140,7 @@ class EventDispatcher {
     Serial.println(" [hub] ||| mqtt serial is ready.");
 
     mqtt.publish(config.status_topic, "Online");
-    mqtt.publishInformationData();
+    // mqtt.publishInformationData();
     mqtt.publish(config.state_topic, this->lightState->getCurrentStateAsJSON());
   }
 
@@ -224,5 +236,5 @@ class EventDispatcher {
   }
 };
 
-extern EventDispatcher EventHub;
+// extern EventDispatcher EventHub;
 #endif  // EVENTDISPATCHER_HPP
