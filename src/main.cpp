@@ -30,8 +30,8 @@
 #endif
 
 #include <Credentials.h>
+#include <EventDispatcher.h>
 #include <LedshelfConfig.h>
-#include <EventDispatcher.hpp>
 
 FASTLED_USING_NAMESPACE
 
@@ -95,7 +95,7 @@ void setup() {
   Serial.println();
   Serial.printf("[main] Starting version %s...\n", VERSION);
 
-  eventhub.enableVerboseOutput();
+  eventhub.enableVerboseOutput(true);
 #endif
 
   eventhub.begin();
