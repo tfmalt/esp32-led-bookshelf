@@ -20,6 +20,11 @@ class AbstractMQTTController {
   virtual bool connect() = 0;
   virtual bool connected() = 0;
 
+  virtual bool publish(const char* topic, const char* message) = 0;
+  virtual bool publish(std::string topic, std::string message) = 0;
+  virtual bool subscribe(std::string topic) = 0;
+  virtual bool subscribe(const char* topic) = 0;
+
   AbstractMQTTController& onReady(OnReadyFunction callback);
   AbstractMQTTController& onDisconnect(OnDisconnectFunction msg);
   AbstractMQTTController& onError(OnErrorFunction error);
@@ -29,19 +34,10 @@ class AbstractMQTTController {
   AbstractMQTTController& emitError(std::string);
   AbstractMQTTController& emitMessage(std::string, std::string);
 
-  AbstractMQTTController& enableVerboseOutput() {
-    return enableVerboseOutput(true);
-  };
-
+  AbstractMQTTController& enableVerboseOutput();
   AbstractMQTTController& enableVerboseOutput(bool v);
-  bool verbose() { return _verbose; };
 
-  virtual bool publish(const char* topic, const char* message) = 0;
-  virtual bool publish(std::string topic, std::string message) = 0;
-  virtual bool subscribe(std::string topic) = 0;
-  virtual bool subscribe(const char* topic) = 0;
-  // void publishInformation(const char *message);
-  // void publishInformationData();
+  bool verbose();
 
  private:
   OnMessageFunction _onMessage;
@@ -49,7 +45,11 @@ class AbstractMQTTController {
   OnDisconnectFunction _onDisconnect;
   OnErrorFunction _onError;
 
-  std::vector<std::string> subscriptions;
+  std::vector<OnReadyFunction> _onReadyList;
+  std::vector<OnMessageFunction> _onMessageList;
+  std::vector<OnDisconnectFunction> _onDisconnectList;
+  std::vector<OnErrorFunction> _onErrorList;
+  std::vector<std::string> _subscriptions;
 
   bool _verbose = false;
 };
