@@ -30,48 +30,42 @@ AbstractMQTTController& AbstractMQTTController::onError(OnErrorFunction _c) {
   return *this;
 }
 
-// AbstractMQTTController& AbstractMQTTController::onMessage(
-//     std::function<void(std::string, std::string)> callback) {
-//   this->_onMessage = callback;
-//   return *this;
-// }
-//
-// AbstractMQTTController& AbstractMQTTController::onReady(
-//     std::function<void()> callback) {
-//   this->_onReady = callback;
-//   return *this;
-// }
-//
-// AbstractMQTTController& AbstractMQTTController::onDisconnect(
-//     std::function<void(std::string msg)> callback) {
-//   this->_onDisconnect = callback;
-//   return *this;
-// }
-//
-// AbstractMQTTController& AbstractMQTTController::onError(
-//     std::function<void(std::string error)> callback) {
-//   this->_onError = callback;
-//   return *this;
-// }
-
 AbstractMQTTController& AbstractMQTTController::emitReady() {
-  this->_onReady();
+  Serial.println("Inside emitReady");
+  for (auto func : this->_onReadyList) {
+    if (func != nullptr) {
+      func();
+    }
+  }
+
   return *this;
 }
 
 AbstractMQTTController& AbstractMQTTController::emitDisconnect(std::string m) {
-  this->_onDisconnect(m);
+  for (auto func : this->_onDisconnectList) {
+    if (func != nullptr) {
+      func(m);
+    }
+  }
   return *this;
 }
 
 AbstractMQTTController& AbstractMQTTController::emitError(std::string e) {
-  this->_onError(e);
+  for (auto func : this->_onErrorList) {
+    if (func != nullptr) {
+      func(e);
+    }
+  }
   return *this;
 }
 
 AbstractMQTTController& AbstractMQTTController::emitMessage(std::string t,
                                                             std::string m) {
-  this->_onMessage(t, m);
+  for (auto func : this->_onMessageList) {
+    if (func != nullptr) {
+      func(t, m);
+    }
+  }
   return *this;
 }
 
