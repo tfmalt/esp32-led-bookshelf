@@ -33,8 +33,8 @@ void EventDispatcher::begin() {
   }
 
 #ifdef TEENSY
-  Serial3.begin(RXTX_BAUD_RATE);
 #ifdef ATMQTT
+  Serial3.begin(RXTX_BAUD_RATE);
   mqtt.begin(Serial3, config.wifi_ssid.c_str(), config.wifi_psk.c_str(),
              config.mqtt_server.c_str(), config.mqtt_port,
              config.mqtt_username.c_str(), config.mqtt_password.c_str(),
@@ -48,7 +48,7 @@ void EventDispatcher::begin() {
   mqtt.onMessage(
       [this](std::string t, std::string m) { this->handleMessage(t, m); });
   mqtt.onReady([this]() { this->handleReady(); });
-  // mqtt.onMissingSubscribe([this]() { this->handleSubscribe(); });
+  mqtt.onMissingSubscribe([this]() { this->handleSubscribe(); });
   mqtt.onDisconnect([this](std::string msg) { this->handleDisconnect(msg); });
   mqtt.onError([this](std::string err) { this->handleError(err); });
 }
@@ -86,14 +86,16 @@ void EventDispatcher::publishInformation() {
   // mqtt.publishInformationData();
 }
 
+// ==========================================================================
+// Loop
+// ==========================================================================
 void EventDispatcher::loop() {
-  // Serial.println("DEBuG: eventdispatcher loop");
   mqtt.loop();
-  // Serial.println("DEBuG: eventdispatcher loop after");
 
-  EVERY_N_SECONDS(10) {
-    Serial.println(" [hub] inside loop");
-    // publishStatus();
+  EVERY_N_SECONDS(60) {
+    if (mqtt.connected()) {
+      publishStatus();
+    }
     // publishInformation();  // todo: clean up this
   }
 }
@@ -128,6 +130,8 @@ void EventDispatcher::handleSubscribe() {
   delay(1000);  // wait a second between each subscribe.
   Serial.printf(" [hub] >>> subscribe: %s\n", config.query_topic.c_str());
   mqtt.subscribe(config.query_topic);
+  delay(1000);
+  publishStatus();
 }
 
 void EventDispatcher::handleMessage(std::string topic, std::string message) {

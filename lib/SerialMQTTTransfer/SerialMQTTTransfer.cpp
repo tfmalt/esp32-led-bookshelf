@@ -15,6 +15,12 @@ void SerialMQTTTransfer::begin() {
   rxtx.begin(Serial3);
 }
 
+/**
+ * @brief Verify the connection to mqtt bridge
+ *
+ * @return true
+ * @return false
+ */
 bool SerialMQTTTransfer::connect() {
   MQTTMessage msg;
   // Serial.printf("debug: %u, %u\n", millis(), start_time);
@@ -23,6 +29,8 @@ bool SerialMQTTTransfer::connect() {
     msg.type = MQTTMessageType::CONNECT;
     strcpy(msg.topic, "CONNECT");
     strcpy(msg.message, "");
+    msg.qos = 0;
+    msg.count = 0;
 
     rxtx.sendDatum(msg);
     start_time = millis();
@@ -31,14 +39,18 @@ bool SerialMQTTTransfer::connect() {
   return true;
 }
 
+// ==========================================================================
+// Loop
+// ==========================================================================
 void SerialMQTTTransfer::loop() {
-  Serial.println("mqtt transfer loop");
+  // Serial.println("mqtt transfer loop");
   if (rxtx.available()) {
     MQTTMessage msg;
     // msg.count = 0;
     rxtx.rxObj(msg);
-    Serial.println("Got transfer");
     this->_lastHeartbeat = millis();
+    this->_isConnected = true;
+
     switch (msg.type) {
       case MQTTMessageType::MESSAGE: {
         if (verbose()) {
@@ -60,7 +72,7 @@ void SerialMQTTTransfer::loop() {
         if (verbose()) {
           Serial.printf("[mqtt] <<< STATUS OK: count: %i\n", msg.count);
         }
-        // this->_isConnected = true;
+
         if (msg.count < 2) {
           this->emitMissingSubscribe();
         }
@@ -170,7 +182,6 @@ void SerialMQTTTransfer::checkConnection() {
 void SerialMQTTTransfer::handleConnection() {
   this->_isConnected = true;
   this->_lastHeartbeat = millis();
-
   if (verbose()) {
     Serial.println("[mqtt] ||| serial connected.");
   }
