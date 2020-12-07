@@ -650,6 +650,14 @@ void Effects::Controller::effectMusicDancer() {
   //   fftComputeSampleset();
   //   fftFillBuckets();
 
+  EVERY_N_MILLIS(1000) {
+    Serial.print("buckets: ");
+    for (auto b : buckets) {
+      Serial.printf("\t%i", b);
+    }
+    Serial.println();
+  }
+
   uint16_t middle = LED_COUNT / 2;
 
   uint16_t bass_size = LED_COUNT / 10;
